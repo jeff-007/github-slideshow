@@ -3,6 +3,7 @@ const path = require('path')
 function resolve(dir) {
   return path.join(__dirname, dir)
 }
+const port = process.env.port || process.env.npm_config_port || 9527 // dev port
 module.exports = {
   /**
    * You will need to set publicPath if you plan to deploy your site under a sub path,
@@ -17,6 +18,28 @@ module.exports = {
   assetsDir: 'static',
   indexPath: 'index.html',
   productionSourceMap: false,
+  devServer: {
+    port: port,
+    open: true,
+    overlay: {
+      warnings: false,
+      errors: true
+    },
+    // proxy: {
+    //   '/api': {
+    //     target: 'https://project.moja.vip',
+    //     changeOrigin: true,
+    //     ws: true,
+    //     pathRewrite: { '^/api': '' }
+    //   },
+    //   '/m': {
+    //     target: 'http://testlocal.wmnetwork.cc',
+    //     changeOrigin: true,
+    //     pathRewrite: {'^/m': ''}
+    //   }
+    // }
+    // proxy: 'http://testlocal.wmnetwork.cc'
+  },
   configureWebpack: {
     resolve: {
       alias: {
@@ -27,10 +50,10 @@ module.exports = {
   css: {
     extract: true,
     sourceMap: false,
-    requireModuleExtension: false,
     loaderOptions: {
       scss: {
-        prependData: `@import "~@/styles/variables.scss";`
+        // 在 sass-loader v8 中，这个选项名是 "prependData"
+        additionalData: `@import "~@/styles/variables.scss";`
       }
     }
   },

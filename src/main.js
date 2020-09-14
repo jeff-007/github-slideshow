@@ -7,6 +7,7 @@ import 'element-ui/lib/theme-chalk/index.css';
 
 Vue.use(ElementUI)
 
+import '@/styles/index.scss' // global css
 
 Vue.config.productionTip = false
 // Vue.prototype.$http = axios
