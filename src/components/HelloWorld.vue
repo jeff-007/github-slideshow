@@ -39,7 +39,9 @@ export default {
   data() {
     return {}
   },
-  created() {},
+  created() {
+    console.log(this.$route.params.id)
+  },
   mounted() {}
 }
 </script>
