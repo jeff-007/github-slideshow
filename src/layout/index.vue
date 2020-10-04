@@ -25,8 +25,8 @@ export default {
       handler: function(to, from) {
         console.log(to)
         console.log(from)
-        const toDepth = to.path.split('/').length
-        const fromDepth = from.path.split('/').length
+        const toDepth = to && to.path.split('/').length
+        const fromDepth = from && from.path.split('/').length
         this.transitionName = toDepth < fromDepth ? 'fade-transform' : 'pop-transform'
       },
       immediate: true

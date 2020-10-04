@@ -1,6 +1,6 @@
 <template>
   <div class="hello">
-    <h1>{{ msg }}</h1>
+    <h1>{{ $store.state.demo.count }}---{{ $store.state.demo.commonText }}</h1>
     <p>
       For a guide and recipes on how to configure / customize this project,<br>
       check out the
@@ -31,6 +31,9 @@
 </template>
 
 <script>
+// store中属性值调用的第二种方式
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
+
 export default {
   name: 'HelloWorld',
   props: {
@@ -39,10 +42,26 @@ export default {
   data() {
     return {}
   },
+  computed: {
+    ...mapState(['count', 'commonText']),
+
+    // 把 `this.doneCount` 映射为 `this.$store.getters.doneTools`
+    ...mapGetters({
+      doneCount: 'doneTools',
+      getTodoById: 'getTodoById'
+    }),
+
+    ...mapActions({
+      add: 'actionA'
+    })
+  },
   created() {
     console.log(this.$route.params.id)
   },
-  mounted() {}
+  mounted() {},
+  methods: {
+    ...mapMutations(['increment'])
+  }
 }
 </script>
 
