@@ -16,6 +16,12 @@ const routes = [
         name: 'Meeting',
         component: () => import('@/components/HelloWorld'),
         meta: { cache: true }
+      },
+      {
+        path: 'triangle',
+        name: 'triangle',
+        component: () => import('@/components/triangleDemo'),
+        meta: { cache: true }
       }
     ]
   },
