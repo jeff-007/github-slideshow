@@ -37,7 +37,7 @@ export default {
       scene.add(light1);
       scene.add(light2);
 
-      const triangles = 1600000;
+      const triangles = 30000;
       const geometry = new Three.BufferGeometry();
       const positions = new Float32Array(triangles * 3 * 3);
       const normals = new Float32Array(triangles * 3 * 3);
@@ -132,6 +132,7 @@ export default {
       geometry.addAttribute('normal', new Three.BufferAttribute(normals, 3));
       geometry.addAttribute('color', new Three.BufferAttribute(colors, 3));
 
+      // 计算包裹该geometry的立方体或长方体大小
       geometry.computeBoundingSphere();
 
       const materail = new Three.MeshPhongMaterial({
@@ -151,8 +152,22 @@ export default {
       renderer.gammaOutput = true;
       container.appendChild(renderer.domElement);
 
+      // 鼠标拾取 mouse: 当前鼠标坐标
+      const rayCaster = new Three.Raycaster();
+      const mouse = { x: 0, y: 0 };
+      let INTERSECTED;
+
       window.addEventListener('resize', onWindowResize, false);
-      const that = this
+
+      window.addEventListener('mousemove', onDocumentMouseMove, false);
+      const that = this;
+
+      function onDocumentMouseMove(event) {
+        event.preventDefault();
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+      }
+
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -164,12 +179,29 @@ export default {
         render();
       }
       function render() {
+        // 鼠标拾取元素
+        rayCaster.setFromCamera(mouse, camera); // 即获得一条从相机射向鼠标的线段
+        const intersects = rayCaster.intersectObjects(scene.children); // 获取所有添加到scene中的和相机指向鼠标的线段相交的元素
+        //  INTERSECTED 表示当前已选中的相交元素
+        //  该函数限制了只显示相交的第一个元素，并且设置相交元素所高亮显示的颜色
+        if (intersects.length > 0) {
+          if (INTERSECTED != intersects[0].object) {
+            if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);
+            INTERSECTED = intersects[0].object;
+            INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+            INTERSECTED.material.emissive.setHex('0xff0000')
+          }
+        } else {
+          if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);
+          INTERSECTED = null
+        }
+
         const time = Date.now() * 0.001;
         mesh.rotation.x = time * 0.25;
         mesh.rotation.y = time * 0.5;
         renderer.render(scene, camera);
       }
-      // animate()
+      animate()
     }
   }
 }
