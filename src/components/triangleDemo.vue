@@ -4,6 +4,7 @@
 
 <script>
 import * as Three from 'three';
+const TWEEN = require('@tweenjs/tween.js')
 export default {
   name: 'TriangleDemo',
   components: {},
@@ -17,7 +18,9 @@ export default {
   computed: {},
   created() {},
   mounted() {
-    this.initThree()
+    this.initThree();
+    const coords = { x: 0, y: 0 };
+    const tween = new TWEEN.Tween(coords)
   },
   methods: {
     initThree() {
@@ -142,6 +145,7 @@ export default {
 
       const mesh = new Three.Mesh(geometry, materail);
       scene.add(mesh);
+      initTween()
 
       const renderer = new Three.WebGL1Renderer({ antialias: false });
       renderer.setClearColor(scene.fog.color);
@@ -162,6 +166,11 @@ export default {
       window.addEventListener('mousemove', onDocumentMouseMove, false);
       const that = this;
 
+      // Tween.js动画
+      function initTween() {
+        new TWEEN.Tween(mesh.position).to({ x: -400 }, 3000).repeat(Infinity).start()
+      }
+
       function onDocumentMouseMove(event) {
         event.preventDefault();
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -177,6 +186,7 @@ export default {
       function animate() {
         requestAnimationFrame(animate);
         render();
+        TWEEN.update()
       }
       function render() {
         // 鼠标拾取元素
