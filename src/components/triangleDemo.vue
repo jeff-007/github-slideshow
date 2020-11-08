@@ -1,10 +1,22 @@
 <template>
-    <div class="container" id="container"></div>
+    <div>
+        <canvas id="canvasElem2"></canvas>
+        <!-- 小球散落 -->
+        <canvas id="canvasElem1"></canvas>
+
+        <!-- 三维正方体 -->
+        <div class="container" id="container"></div>
+    </div>
+
 </template>
 
 <script>
 import * as Three from 'three';
+// import Three from '@/three/vtkLoader.js'
 const TWEEN = require('@tweenjs/tween.js')
+import C from '@/canvas/utils.js'
+import { Ball } from '@/canvas/ball.js';
+
 export default {
   name: 'TriangleDemo',
   components: {},
@@ -19,10 +31,118 @@ export default {
   created() {},
   mounted() {
     this.initThree();
-    const coords = { x: 0, y: 0 };
-    const tween = new TWEEN.Tween(coords)
+    // this.initVtkRabbit()
+    this.springBall();
+    this.drawBall()
   },
   methods: {
+    springBall() {
+      const canvas = document.querySelector('#canvasElem1');
+      const ctx = canvas.getContext('2d');
+
+      const W = canvas.width = window.innerWidth;
+      const H = canvas.height = 600;
+
+      const mouse = C.getOffSet(canvas);
+
+      // 小球模拟喷泉
+      const balls = [];
+      const g = 0.05;
+      for (let i = 0; i < 100; i++) {
+        balls.push(new Ball({
+          x: W / 2,
+          y: H,
+          r: Math.random() > 0.9 ? C.randomNum([25, 40]) : C.randomNum([15, 30]),
+          fillStyle: C.randomColor(),
+          vx: C.randomNum([-3, 3]),
+          vy: C.randomNum([0, -10])
+        }))
+      }
+      const that = this;
+      function drawBall(ball) {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        ball.vy += g;
+        // 超过边界后初始化
+        if (ball.x - ball.r >= W || ball.x + ball.r <= 0 || ball.y - ball.r >= H || ball.y + ball.r <= 0) {
+          ball.x = W / 2;
+          ball.y = H;
+          ball.vx = C.randomNum([-3, 3]);
+          ball.vy = C.randomNum([0, -10]);
+        }
+        ball.render(ctx);
+      }
+
+      (function move() {
+        window.requestAnimationFrame(move);
+        ctx.clearRect(0, 0, W, H);
+        balls.forEach(drawBall);
+      })();
+    },
+    drawBall() {
+      const canvas = document.querySelector('#canvasElem2');
+      const ctx = canvas.getContext('2d');
+
+      const W = canvas.width = window.innerWidth;
+      const H = canvas.height = 600;
+
+      const mouse = C.getOffSet(canvas);
+      const _that = this;
+      // 小球散落
+      const ballList = []; const num = 200; const g = 0.2; const bounce = -0.8;
+      const floor = 300; // 小球落地高度
+      const f1 = 250; // 视距
+      const hx = W / 2; const hy = H / 2; // 消失点
+      const ballColor = ctx.createRadialGradient(0, 0, 0, 0, 0, 10);
+      ballColor.addColorStop(0, 'rgb(255, 255, 255)');
+      ballColor.addColorStop(0.3, 'rgba(0, 255, 240, 1)');
+      ballColor.addColorStop(0.5, 'rgba(0, 240, 255, 1)');
+      ballColor.addColorStop(0.8, 'rgba(0, 110, 255, 0.8)');
+      ballColor.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+      for (let i = 0; i < num; i++) {
+        ballList.push(new Ball({
+          y3d: -200,
+          r: 10,
+          fillStyle: ballColor,
+          vx: C.randomNum([-6, 6]),
+          vy: C.randomNum([-3, -6]),
+          vz: C.randomNum([-5, 5])
+        }))
+      }
+      function move(ball) {
+        ball.vy += g;
+        ball.x3d += ball.vx;
+        ball.y3d += ball.vy;
+        ball.z3d += ball.vz;
+        if (ball.y3d > floor) {
+          ball.y3d = floor;
+          ball.vy *= bounce;
+        }
+        if (ball.z3d > -f1) {
+          const scale = f1 / (f1 + ball.z3d);
+          ball.scaleX = ball.scaleY = scale;
+          ball.x = hx + ball.x3d * scale;
+          ball.y = hy + ball.y3d * scale;
+          ball.show = true
+        } else {
+          ball.show = false
+        }
+      }
+      function draw(ball) {
+        ball.show && ball.render(ctx)
+      }
+      function zSort(a, b) {
+        return b.z3d - a.z3d
+      }
+      (function drawBall() {
+        window.requestAnimationFrame(drawBall);
+        ctx.clearRect(0, 0, W, H);
+        ballList.forEach(move);
+        ballList.forEach(zSort);
+        ballList.forEach(draw)
+      })();
+    },
+
     initThree() {
       const container = document.getElementById('container');
       const camera = new Three.PerspectiveCamera(27, window.innerWidth / window.innerHeight, 1, 3500);
@@ -145,7 +265,7 @@ export default {
 
       const mesh = new Three.Mesh(geometry, materail);
       scene.add(mesh);
-      initTween()
+      // initTween()
 
       const renderer = new Three.WebGL1Renderer({ antialias: false });
       renderer.setClearColor(scene.fog.color);
@@ -169,6 +289,12 @@ export default {
       // Tween.js动画
       function initTween() {
         new TWEEN.Tween(mesh.position).to({ x: -400 }, 3000).repeat(Infinity).start()
+      }
+      function initGrid() {
+        // 网格的边长是1000，每个小网格的边长是50
+        const helper = new Three.GridHelper(1000, 50);
+        helper.setColors(0x0000ff, 0x808080);
+        scene.add(helper);
       }
 
       function onDocumentMouseMove(event) {
@@ -213,10 +339,80 @@ export default {
       }
       animate()
     }
+
+    // vtk兔子模型
+    // initVtkRabbit() {
+    //   let container, stats;
+    //   let camera, scene, renderer;
+    //   let cross;
+    //   let controls = {}
+    //   init();
+    //   animate();
+    //
+    //   function init() {
+    //     camera = new Three.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1e10);
+    //     camera.position.z = 0.2;
+    //
+    //     controls.rotateSpeed = 5.0;
+    //     controls.zoomSpeed = 5;
+    //     controls.panSpeed = 2;
+    //
+    //     controls.noZoom = false;
+    //     controls.noPan = false;
+    //
+    //     controls.staticMoving = true;
+    //     controls.dynamicDampingFactor = 0.3;
+    //
+    //     scene = new Three.Scene();
+    //     scene.add(camera);
+    //
+    //     // 方向光
+    //     let dirLight = new Three.DirectionalLight(0xffffff);
+    //     dirLight.position.set(200, 200, 1000).normalize();
+    //
+    //     camera.add(dirLight);
+    //     camera.add(dirLight.target);
+    //     // A begin
+    //     let material = new Three.MeshLambertMaterial({ color: 0xffffff, side: Three.DoubleSide });
+    //     let loader = new Three.VTKLoader();
+    //     loader.addEventListener('load', function(event) {
+    //       let geometry = event.content;
+    //       let mesh = new Three.Mesh(geometry, material);
+    //       mesh.position.setY(-0.09);
+    //       scene.add(mesh);
+    //     });
+    //     loader.load('../assets/three/bunny.vtk');
+    //     // A end
+    //     // renderer
+    //     renderer = new Three.WebGLRenderer({ antialias: false });
+    //     renderer.setSize(window.innerWidth, window.innerHeight);
+    //     container = document.getElementById('container');
+    //     container.appendChild(renderer.domElement);
+    //
+    //
+    //     window.addEventListener('resize', onWindowResize, false);
+    //   }
+    //
+    //   function onWindowResize() {
+    //     camera.aspect = window.innerWidth / window.innerHeight;
+    //     camera.updateProjectionMatrix();
+    //     renderer.setSize(window.innerWidth, window.innerHeight);
+    //     // controls.handleResize();
+    //   }
+    //
+    //   function animate() {
+    //     requestAnimationFrame(animate);
+    //     // controls.update();
+    //     renderer.render(scene, camera);
+    //   }
+    // }
   }
 }
 </script>
 
 <style scoped lang="scss">
-
+    canvas{
+        background: rgba(0, 0, 0, 1);
+        margin: 40px 0;
+    }
 </style>
