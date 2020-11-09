@@ -2,7 +2,13 @@
     <div>
         <canvas id="canvasElem2"></canvas>
         <!-- 小球散落 -->
-        <canvas id="canvasElem1"></canvas>
+<!--        <canvas id="canvasElem1"></canvas>-->
+
+        <!-- 粒子花园 -->
+        <canvas id="canvasElem3"></canvas>
+
+        <!-- 3d星空环绕 -->
+        <canvas id="canvasElem4"></canvas>
 
         <!-- 三维正方体 -->
         <div class="container" id="container"></div>
@@ -30,12 +36,200 @@ export default {
   computed: {},
   created() {},
   mounted() {
-    this.initThree();
     // this.initVtkRabbit()
-    this.springBall();
-    this.drawBall()
+    // this.springBall();
+    this.drawBall();
+    this.initParticles();
+    this.initThree();
+    this.initStars()
   },
   methods: {
+    initStars() {
+      const canvas = document.querySelector('#canvasElem4');
+      const ctx = canvas.getContext('2d');
+
+      let W = canvas.width = window.innerWidth;
+      const H = canvas.height = 600;
+
+      const mouse = C.getOffSet(canvas);
+      let hx; let hy; const f1 = 250;
+      const maxZ = 1200; // 小球z坐标最远超过1200时进行重新绘制
+      let particles = []; // 粒子保存数组
+      const f = 0.8
+
+      // 动态设置画布尺寸， 以及隐藏点坐标
+      window.onresize = function() {
+        W = canvas.width = window.innerWidth;
+        hx = W / 2;
+        hy = H / 2;
+        createParticles(W * H / 3200)
+      }
+
+      function createParticles(num) {
+        // 窗口大小变化时，重新绘制粒子
+        if (particles.length != num) {
+          particles = [];
+        }
+        for (let i = 0; i < num; i++) {
+          particles.push(new Ball({
+            x3d: C.randomNum([-1.5 * W, 2 * W]),
+            y3d: C.randomNum([-1.5 * W, 2 * W]),
+            z3d: C.randomNum([0, maxZ]),
+            r: 10,
+            vz: C.randomNum([-2, 2]), // z轴上的速度
+            az: C.randomNum([-2, -1]) // z轴上的加速度
+          }))
+        }
+      }
+
+      window.onresize();
+
+      function move(p) {
+        p.vz += p.az;
+        p.vz *= f;
+        p.z3d += p.vz
+
+        // 粒子运动到视点时，重制粒子至消失点
+        if (p.z3d < -f1) {
+          p.z3d += maxZ;
+        }
+
+        // 三维运动缩放比
+        const scale = f1 / (f1 + p.z3d);
+        p.scaleX = p.scaleY = scale;
+
+        // 粒子在画布中的真实坐标
+        p.x = hx + p.x3d * scale;
+        p.y = hy + p.y3d * scale;
+
+        p.alpha = Math.min(Math.abs(scale) * 1.5, 1)
+
+      }
+
+      function drawStar(p) {
+        p.render(ctx)
+      }
+
+      // 排序
+      function zSort(a, b) {
+        return b.z3d - a.z3d
+      }
+
+      (function draw() {
+        window.requestAnimationFrame(draw)
+
+        ctx.clearRect(0, 0, W, H);
+
+        particles.forEach(move);
+        particles.forEach(zSort);
+        particles.forEach(drawStar);
+      })()
+    },
+    initParticles() {
+      const canvas = document.querySelector('#canvasElem3');
+      const ctx = canvas.getContext('2d');
+
+      let W = canvas.width = window.innerWidth;
+      const H = canvas.height = 600;
+
+      const mouse = C.getOffSet(canvas);
+
+      const particles = []; const spring = 0.0001;
+
+      function reCreate() {
+        W = canvas.width = window.innerWidth;
+        createParticles(W * H / 10000);
+      }
+
+      reCreate()
+      window.onresize = reCreate
+
+      function createParticles(num) {
+        // 窗口大小改变后，先清空粒子数组
+        if (num !== particles.length) {
+          particles.length = 0;
+        }
+        for (let i = 0; i < num; i++) {
+          particles.push(new Ball({
+            x: C.randomNum([0, W]),
+            y: C.randomNum([0, H]),
+            fillStyle: '#fff',
+            vx: C.randomNum([-2, 2]),
+            vy: C.randomNum([-2, 2]),
+            r: C.randomNum([3, 10])
+          }))
+        }
+      }
+
+      // 绘制粒子
+      function draw(particle) {
+        particle.render(ctx);
+      }
+
+      // 绘制粒子连线，粒子距离越远线条越细
+      function drawLine(current, target, dist, minDist) {
+        ctx.save();
+        ctx.lineWidth = 2 * Math.max(0, (1 - dist / minDist));
+        ctx.globalAlpha = Math.max(0, (1 - dist / minDist));
+        ctx.strokeStyle = '#fff';
+        ctx.beginPath();
+        ctx.lineTo(current.x, current.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function checkSpring(current, target) {
+        // 两个粒子之间的距离
+        const dx = target.x - current.x;
+        const dy = target.y - current.y;
+        const dist = Math.sqrt(dx ** 2 + dy ** 2);
+
+        // 设置最小距离，当两个粒子之间的距离小于最小距离进行弹动，并绘制连线
+        const minDist = W / 10;
+        if (dist < minDist) {
+          drawLine(current, target, dist, minDist);
+          const ax = dx * spring;
+          const ay = dy * spring;
+          current.vx += ax;
+          current.vy += ay;
+          target.vx -= ax;
+          target.vy -= ay;
+        }
+      }
+
+      function move(particle, i) {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+
+        // 粒子之间的碰撞处理，target保存需要和当前粒子进行碰撞检测的目标粒子
+        for (let j = i + 1; j < particles.length; j++) {
+          const target = particles[j];
+          checkSpring(particle, target)
+        }
+
+        // 边界处理，超过某侧边界后会从另外一侧出现
+        if (particle.x - particle.r > W) {
+          particle.x = -particle.r;
+        } else if (particle.x + particle.r < 0) {
+          particle.x = W + particle.r;
+        }
+        if (particle.y - particle.r > H) {
+          particle.y = -particle.r;
+        } else if (particle.y + particle.r < 0) {
+          particle.y = H + particle.r;
+        }
+      }
+
+      (function drawFrame() {
+        window.requestAnimationFrame(drawFrame);
+
+        ctx.clearRect(0, 0, W, H);
+
+        particles.forEach(move)
+        particles.forEach(draw)
+      })()
+    },
     springBall() {
       const canvas = document.querySelector('#canvasElem1');
       const ctx = canvas.getContext('2d');
