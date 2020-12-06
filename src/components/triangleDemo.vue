@@ -1,14 +1,14 @@
 <template>
     <div>
-        <canvas id="canvasElem2"></canvas>
-        <!-- 小球散落 -->
-<!--        <canvas id="canvasElem1"></canvas>-->
+<!--        <canvas id="canvasElem2"></canvas>-->
+<!--        &lt;!&ndash; 小球散落 &ndash;&gt;-->
+<!--&lt;!&ndash;        <canvas id="canvasElem1"></canvas>&ndash;&gt;-->
 
-        <!-- 粒子花园 -->
-        <canvas id="canvasElem3"></canvas>
+<!--        &lt;!&ndash; 粒子花园 &ndash;&gt;-->
+<!--        <canvas id="canvasElem3"></canvas>-->
 
-        <!-- 3d星空环绕 -->
-        <canvas id="canvasElem4"></canvas>
+<!--        &lt;!&ndash; 3d星空环绕 &ndash;&gt;-->
+<!--        <canvas id="canvasElem4"></canvas>-->
 
         <!-- 三维正方体 -->
         <div class="container" id="container"></div>
@@ -22,6 +22,11 @@ import * as Three from 'three';
 const TWEEN = require('@tweenjs/tween.js')
 import C from '@/canvas/utils.js'
 import { Ball } from '@/canvas/ball.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import * as Stats from 'three/examples/js/libs/stats.min.js'
+import * as dat from 'three/examples/jsm/libs/dat.gui.module.js'
+import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
+
 
 export default {
   name: 'TriangleDemo',
@@ -35,15 +40,377 @@ export default {
   },
   computed: {},
   created() {},
-  mounted() {
-    // this.initVtkRabbit()
-    // this.springBall();
-    this.drawBall();
-    this.initParticles();
-    this.initThree();
-    this.initStars()
-  },
+  mounted() {},
   methods: {
+    //  环境光demo
+    initAmbientLight() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      const renderer = new Three.WebGLRenderer();
+
+      renderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMapEnabled = true;
+
+      // create the ground plane
+      const planeGeometry = new Three.PlaneGeometry(60, 20, 1, 1);
+      const planeMaterial = new Three.MeshLambertMaterial({ color: 0xffffff });
+      var plane = new Three.Mesh(planeGeometry, planeMaterial);
+      plane.receiveShadow = true;
+
+      // rotate and position the plane
+      plane.rotation.x = -0.5 * Math.PI;
+      plane.position.x = 15;
+      plane.position.y = 0;
+      plane.position.z = 0;
+
+      // add the plane to the scene
+      scene.add(plane);
+
+      // create a cube
+      const cubeGeometry = new Three.BoxGeometry(4, 4, 4);
+      const cubeMaterial = new Three.MeshLambertMaterial({ color: 0xff0000 });
+      const cube = new Three.Mesh(cubeGeometry, cubeMaterial);
+      cube.castShadow = true;
+
+      // position the cube
+      cube.position.x = -4;
+      cube.position.y = 3;
+      cube.position.z = 0;
+
+      // add the cube to the scene
+      scene.add(cube);
+
+      const sphereGeometry = new Three.SphereGeometry(4, 20, 20);
+      const sphereMaterial = new Three.MeshLambertMaterial({ color: 0x7777ff });
+      const sphere = new Three.Mesh(sphereGeometry, sphereMaterial);
+
+      // position the sphere
+      sphere.position.x = 20;
+      sphere.position.y = 0;
+      sphere.position.z = 2;
+      sphere.castShadow = true;
+
+      // add the sphere to the scene
+      scene.add(sphere);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = -25;
+      camera.position.y = 30;
+      camera.position.z = 25;
+      camera.lookAt(new Three.Vector3(10, 0, 0));
+
+      // add subtle ambient lighting
+      const ambiColor = '#0c0c0c';
+      const ambientLight = new Three.AmbientLight(ambiColor);
+      scene.add(ambientLight);
+
+      // add spotlight for the shadows
+      const spotLight = new Three.SpotLight(0xffffff);
+      spotLight.position.set(-40, 60, -10);
+      spotLight.castShadow = true;
+      scene.add(spotLight);
+
+      const helper = new Three.SpotLightHelper(spotLight);
+      scene.add(helper);
+
+
+      // 调试投影
+      // let debugCamera = new Three.CameraHelper(spotLight.shadow.camera);
+      // scene.add(debugCamera)
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      // call the render function
+      let step = 0;
+
+      const controls = new function() {
+        this.rotationSpeed = 0.02;
+        this.bouncingSpeed = 0.03;
+        this.ambientColor = ambiColor;
+        this.disableSpotlight = false;
+      }();
+
+      const gui = new dat.GUI();
+      gui.addColor(controls, 'ambientColor').onChange(function(e) {
+        ambientLight.color = new Three.Color(e);
+      });
+      gui.add(controls, 'disableSpotlight').onChange(function(e) {
+        spotLight.visible = !e;
+      });
+
+
+      render();
+
+      function render() {
+        helper.update();
+        stats.update();
+        // rotate the cube around its axes
+        cube.rotation.x += controls.rotationSpeed;
+        cube.rotation.y += controls.rotationSpeed;
+        cube.rotation.z += controls.rotationSpeed;
+
+        // bounce the sphere up and down
+        step += controls.bouncingSpeed;
+        sphere.position.x = 20 + (10 * (Math.cos(step)));
+        sphere.position.y = 2 + (10 * Math.abs(Math.sin(step)));
+
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        const stats = new Stats();
+
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
+    initDemo() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      scene.add(camera);
+
+      // create a render and set the size
+      const renderer = new Three.WebGLRenderer();
+
+      renderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+
+      // create the ground plane
+      const planeGeometry = new Three.PlaneGeometry(60, 40, 1, 1);
+      const planeMaterial = new Three.MeshLambertMaterial({ color: 0xffffff });
+      const plane = new Three.Mesh(planeGeometry, planeMaterial);
+      plane.receiveShadow = true;
+
+      // rotate and position the plane
+      plane.rotation.x = -0.5 * Math.PI;
+      plane.position.x = 0;
+      plane.position.y = 0;
+      plane.position.z = 0;
+
+      // add the plane to the scene
+      scene.add(plane);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = -30;
+      camera.position.y = 40;
+      camera.position.z = 30;
+      camera.lookAt(scene.position);
+
+      // add subtle ambient lighting
+      const ambientLight = new Three.AmbientLight(0x0c0c0c);
+      scene.add(ambientLight);
+
+      // add spotlight for the shadows
+      const spotLight = new Three.SpotLight(0xffffff);
+      spotLight.position.set(-40, 60, -10);
+      spotLight.castShadow = true;
+      scene.add(spotLight);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      // call the render function
+      const step = 0;
+
+      const controls = new function() {
+        this.rotationSpeed = 0.02;
+        this.numberOfObjects = scene.children.length;
+
+        this.removeCube = function() {
+          const allChildren = scene.children;
+          const lastObject = allChildren[allChildren.length - 1];
+          if (lastObject instanceof Three.Mesh) {
+            scene.remove(lastObject);
+            this.numberOfObjects = scene.children.length;
+          }
+        };
+
+        this.addCube = function() {
+
+          const cubeSize = Math.ceil((Math.random() * 3));
+          const cubeGeometry = new Three.BoxGeometry(cubeSize, cubeSize, cubeSize);
+          const cubeMaterial = new Three.MeshLambertMaterial({ color: Math.random() * 0xffffff });
+          const cube = new Three.Mesh(cubeGeometry, cubeMaterial);
+          cube.castShadow = true;
+          cube.name = 'cube-' + scene.children.length;
+
+
+          // position the cube randomly in the scene
+
+          cube.position.x = -30 + Math.round((Math.random() * planeGeometry.parameters.width));
+          cube.position.y = Math.round((Math.random() * 5));
+          cube.position.z = -20 + Math.round((Math.random() * planeGeometry.parameters.height));
+
+          // add the cube to the scene
+          scene.add(cube);
+          this.numberOfObjects = scene.children.length;
+        };
+
+        this.outputObjects = function() {
+          console.log(scene.children);
+        }
+      }();
+
+      const gui = new dat.GUI();
+      gui.add(controls, 'rotationSpeed', 0, 0.5);
+      gui.add(controls, 'addCube');
+      gui.add(controls, 'removeCube');
+      gui.add(controls, 'outputObjects');
+      gui.add(controls, 'numberOfObjects').listen();
+
+      render();
+
+      function render() {
+        stats.update();
+
+        // rotate the cubes around its axes
+        scene.traverse(function(e) {
+          if (e instanceof Three.Mesh && e != plane) {
+
+            e.rotation.x += controls.rotationSpeed;
+            e.rotation.y += controls.rotationSpeed;
+            e.rotation.z += controls.rotationSpeed;
+          }
+        });
+
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        const stats = new Stats();
+
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
+    initShadowDemo() {
+      const scene = new Three.Scene();
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new Three.WebGL1Renderer();
+      renderer.setClearColor(new Three.Color(0x000000));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      const axes = new Three.AxesHelper(20);
+      scene.add(axes);
+
+      const planeGeometry = new Three.PlaneGeometry(120, 40);
+      const planeMaterial = new Three.MeshLambertMaterial({
+        color: 0xAAAAAA
+      });
+
+      const plane = new Three.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -0.5 * Math.PI;
+      plane.position.set(15, 0, 0);
+      scene.add(plane);
+
+      const cubeGeometry = new Three.BoxGeometry(6, 6, 6);
+      const cubeMaterial = new Three.MeshLambertMaterial({
+        color: 0xFF0000,
+        wireframe: false
+      });
+      const cube = new Three.Mesh(cubeGeometry, cubeMaterial);
+      cube.position.set(-4, 3, 0);
+      scene.add(cube);
+
+      const sphereGeometry = new Three.SphereGeometry(6, 20, 20);
+      const sphereMaterial = new Three.MeshLambertMaterial({
+        color: 0x7777FF,
+        wireframe: false
+      });
+      const sphere = new Three.Mesh(sphereGeometry, sphereMaterial);
+      sphere.position.set(20, 4, 2);
+      scene.add(sphere);
+
+      camera.position.set(-30, 40, 30);
+      camera.lookAt(scene.position);
+
+      const spotLight = new Three.SpotLight(0xFFFFFF);
+      spotLight.position.set(-40, 40, -15);
+      // 启用阴影功能
+      spotLight.castShadow = true;
+      spotLight.shadow.mapSize = new Three.Vector2(1024, 1024);
+      spotLight.shadow.camera.far = 130;
+      spotLight.shadow.camera.near = 40;
+      scene.add(spotLight)
+
+      document.getElementById('container').appendChild(renderer.domElement);
+      // 设置接受和投射阴影的物体
+      plane.receiveShadow = true;
+      cube.castShadow = true;
+      sphere.castShadow = true;
+      spotLight.castShadow = true;
+      renderer.shadowMap.enabled = true;
+
+      // 添加动画控制面板
+      const controls = new function() {
+        this.rotationSpeed = 0.02;
+        this.bounceSpeed = 0.02;
+      }()
+      const gui = new dat.GUI();
+      gui.add(controls, 'rotationSpeed', 0, 0.5);
+      gui.add(controls, 'bounceSpeed', 0, 0.5);
+
+      const state = initState();
+      renderScene()
+
+      function renderScene() {
+        state.update();
+        cube.rotation.x += controls.rotationSpeed;
+        cube.rotation.y += controls.rotationSpeed;
+        cube.rotation.z += controls.rotationSpeed;
+        requestAnimationFrame(renderScene);
+        renderer.render(scene, camera)
+      }
+      function initState() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        document.body.appendChild(stats.dom)
+        return stats
+      }
+      function onResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      // listen to the resize events
+      window.addEventListener('resize', onResize, false);
+    },
     initStars() {
       const canvas = document.querySelector('#canvasElem4');
       const ctx = canvas.getContext('2d');
@@ -605,8 +972,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-    canvas{
-        background: rgba(0, 0, 0, 1);
-        margin: 40px 0;
-    }
+    /*canvas{*/
+    /*    background: rgba(0, 0, 0, 1);*/
+    /*    margin: 40px 0;*/
+    /*}*/
 </style>
