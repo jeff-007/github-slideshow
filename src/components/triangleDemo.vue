@@ -27,7 +27,6 @@ import * as Stats from 'three/examples/js/libs/stats.min.js'
 import * as dat from 'three/examples/jsm/libs/dat.gui.module.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 
-
 export default {
   name: 'TriangleDemo',
   components: {},
@@ -40,8 +39,515 @@ export default {
   },
   computed: {},
   created() {},
-  mounted() {},
+  mounted() {
+    this.initPoints()
+  },
   methods: {
+    //  pointCloud
+    initPoints() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0x000000, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = 0;
+      camera.position.y = 0;
+      camera.position.z = 150;
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+
+      createParticles();
+      render();
+
+      function createParticles() {
+        const geom = new Three.Geometry();
+        const material = new Three.PointCloudMaterial({ size: 4, vertexColors: true, color: 0xffffff });
+
+        for (let x = -5; x < 5; x++) {
+          for (let y = -5; y < 5; y++) {
+            const particle = new Three.Vector3(x * 10, y * 10, 0);
+            geom.vertices.push(particle);
+            geom.colors.push(new Three.Color(Math.random() * 0x00ffff));
+          }
+        }
+
+        const cloud = new Three.PointCloud(geom, material);
+        scene.add(cloud);
+      }
+      function render() {
+        stats.update();
+        requestAnimationFrame(render);
+        webGLRenderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        var stats = new Stats();
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
+    //  创建法向量
+    initNormalMaterial() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      let renderer;
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+      webGLRenderer.shadowMap.enabled = true;
+
+
+      // let canvasRenderer = new Three.CanvasRenderer();
+      // canvasRenderer.setSize(window.innerWidth, window.innerHeight);
+      renderer = webGLRenderer;
+
+      const groundGeom = new Three.PlaneGeometry(100, 100, 4, 4);
+      const groundMesh = new Three.Mesh(groundGeom, new Three.MeshBasicMaterial({ color: 0x777777 }));
+      groundMesh.rotation.x = -Math.PI / 2;
+      groundMesh.position.y = -20;
+      scene.add(groundMesh);
+
+      const sphereGeometry = new Three.SphereGeometry(14, 20, 20);
+      const cubeGeometry = new Three.BoxGeometry(15, 15, 15);
+      const planeGeometry = new Three.PlaneGeometry(14, 14, 4, 4);
+
+
+      var meshMaterial = new Three.MeshNormalMaterial({ color: 0x7777ff });
+      var sphere = new Three.Mesh(sphereGeometry, meshMaterial);
+      var cube = new Three.Mesh(cubeGeometry, meshMaterial);
+      var plane = new Three.Mesh(planeGeometry, meshMaterial);
+
+      // position the sphere
+      sphere.position.x = 0;
+      sphere.position.y = 3;
+      sphere.position.z = 2;
+
+      console.log('======')
+      console.log(sphere);
+
+      // 生成每个面的法线
+      // 每个面face中包含了构成该面的顶点在vertices中的索引
+      // 通过centroid.add方法将当前三个点的x,y,z坐标分别相加
+      for (let f = 0, fl = sphere.geometry.faces.length; f < fl; f++) {
+        const face = sphere.geometry.faces[f];
+        const centroid = new Three.Vector3(0, 0, 0);
+        centroid.add(sphere.geometry.vertices[face.a]);
+        centroid.add(sphere.geometry.vertices[face.b]);
+        centroid.add(sphere.geometry.vertices[face.c]);
+        console.log(centroid)
+        centroid.divideScalar(3);
+
+        const arrow = new Three.ArrowHelper(
+          face.normal,
+          centroid,
+          2,
+          0x3333FF,
+          0.5,
+          0.5);
+        sphere.add(arrow);
+      }
+
+
+      cube.position.set(sphere.position.x, sphere.position.y, sphere.position.z);
+      plane.position.set(sphere.position.x, sphere.position.y, sphere.position.z);
+
+
+      // add the sphere to the scene
+      scene.add(cube);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = -20;
+      camera.position.y = 30;
+      camera.position.z = 40;
+      camera.lookAt(new Three.Vector3(10, 0, 0));
+
+      // add subtle ambient lighting
+      const ambientLight = new Three.AmbientLight(0x0c0c0c);
+      scene.add(ambientLight);
+
+      // add spotlight for the shadows
+      const spotLight = new Three.SpotLight(0xffffff);
+      spotLight.position.set(-40, 60, -10);
+      spotLight.castShadow = true;
+      scene.add(spotLight);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      // call the render function
+      let step = 0;
+      const oldContext = null;
+
+      const controls = new function() {
+        this.rotationSpeed = 0.02;
+        this.bouncingSpeed = 0.03;
+
+        this.opacity = meshMaterial.opacity;
+        this.transparent = meshMaterial.transparent;
+
+        this.visible = meshMaterial.visible;
+        this.side = 'front';
+
+        this.wireframe = meshMaterial.wireframe;
+        this.wireframeLinewidth = meshMaterial.wireframeLinewidth;
+
+        this.selectedMesh = 'cube';
+
+        this.shadow = 'flat';
+
+      }();
+
+      const gui = new dat.GUI();
+
+
+      const spGui = gui.addFolder('Mesh');
+      spGui.add(controls, 'opacity', 0, 1).onChange(function(e) {
+        meshMaterial.opacity = e
+      });
+      spGui.add(controls, 'transparent').onChange(function(e) {
+        meshMaterial.transparent = e
+      });
+      spGui.add(controls, 'wireframe').onChange(function(e) {
+        meshMaterial.wireframe = e
+      });
+      spGui.add(controls, 'wireframeLinewidth', 0, 20).onChange(function(e) {
+        meshMaterial.wireframeLinewidth = e
+      });
+      spGui.add(controls, 'visible').onChange(function(e) {
+        meshMaterial.visible = e
+      });
+      spGui.add(controls, 'side', ['front', 'back', 'double']).onChange(function(e) {
+        console.log(e);
+        switch (e) {
+          case 'front':
+            meshMaterial.side = Three.FrontSide;
+            break;
+          case 'back':
+            meshMaterial.side = Three.BackSide;
+            break;
+          case 'double':
+            meshMaterial.side = Three.DoubleSide;
+            break;
+        }
+        meshMaterial.needsUpdate = true;
+
+      });
+      spGui.add(controls, 'shadow', ['flat', 'smooth']).onChange(function(e) {
+        switch (e) {
+          case 'flat':
+            // https://github.com/mrdoob/three.js/issues/1929
+            meshMaterial.shading = Three.FlatShading;
+            break;
+          case 'smooth':
+            meshMaterial.shading = Three.SmoothShading;
+            break;
+        }
+
+        const oldPos = sphere.position.clone();
+        scene.remove(sphere);
+        scene.remove(plane);
+        scene.remove(cube);
+        sphere = new Three.Mesh(sphere.geometry.clone(), meshMaterial);
+        cube = new Three.Mesh(cube.geometry.clone(), meshMaterial);
+        plane = new Three.Mesh(plane.geometry.clone(), meshMaterial);
+
+        sphere.position.set(oldPos.x, oldPos.y, oldPos.z);
+        cube.position.set(oldPos.x, oldPos.y, oldPos.z);
+        plane.position.set(oldPos.x, oldPos.y, oldPos.z);
+
+        switch (controls.selectedMesh) {
+          case 'cube':
+            scene.add(cube);
+
+            break;
+          case 'sphere':
+            scene.add(sphere);
+
+            break;
+          case 'plane':
+            scene.add(plane);
+            break;
+
+        }
+
+        meshMaterial.needsUpdate = true;
+      });
+
+      spGui.add(controls, 'selectedMesh', ['cube', 'sphere', 'plane']).onChange(function(e) {
+
+        scene.remove(plane);
+        scene.remove(cube);
+        scene.remove(sphere);
+
+
+        switch (e) {
+          case 'cube':
+            scene.add(cube);
+
+            break;
+          case 'sphere':
+            scene.add(sphere);
+
+            break;
+          case 'plane':
+            scene.add(plane);
+            break;
+
+        }
+
+        scene.add(e);
+      });
+
+      render();
+
+      function render() {
+        stats.update();
+
+        cube.rotation.y = step += 0.01;
+        plane.rotation.y = step;
+        sphere.rotation.y = step;
+
+
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        const stats = new Stats();
+
+        stats.setMode(0); // 0: fps, 1: ms
+
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
+    //  半球光，更贴近环境光
+    initHemiLight() {
+      var stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      var scene = new Three.Scene();
+      scene.fog = new Three.Fog(0xaaaaaa, 0.010, 200);
+
+      // create a camera, which defines where we're looking at.
+      var camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+
+      // create a render and set the size
+      var renderer = new Three.WebGLRenderer();
+
+      renderer.setClearColor(new Three.Color(0xaaaaff, 1.0));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+
+
+      // create the ground plane
+      var textureGrass = Three.ImageUtils.loadTexture('../assets/textures/ground/grasslight-big.jpg');
+      textureGrass.wrapS = Three.RepeatWrapping;
+      textureGrass.wrapT = Three.RepeatWrapping;
+      textureGrass.repeat.set(4, 4);
+
+
+      var planeGeometry = new Three.PlaneGeometry(1000, 200, 20, 20);
+      var planeMaterial = new Three.MeshLambertMaterial({ map: textureGrass });
+      //        var planeMaterial = new Three.MeshLambertMaterial();
+      var plane = new Three.Mesh(planeGeometry, planeMaterial);
+      plane.receiveShadow = true;
+
+      // rotate and position the plane
+      plane.rotation.x = -0.5 * Math.PI;
+      plane.position.x = 15;
+      plane.position.y = 0;
+      plane.position.z = 0;
+
+      // add the plane to the scene
+      scene.add(plane);
+
+      // create a cube
+      var cubeGeometry = new Three.BoxGeometry(4, 4, 4);
+      var cubeMaterial = new Three.MeshLambertMaterial({ color: 0xff3333 });
+      var cube = new Three.Mesh(cubeGeometry, cubeMaterial);
+      cube.castShadow = true;
+
+      // position the cube
+      cube.position.x = -4;
+      cube.position.y = 3;
+      cube.position.z = 0;
+
+      // add the cube to the scene
+      scene.add(cube);
+
+      var sphereGeometry = new Three.SphereGeometry(4, 25, 25);
+      var sphereMaterial = new Three.MeshLambertMaterial({ color: 0x7777ff });
+      var sphere = new Three.Mesh(sphereGeometry, sphereMaterial);
+
+      // position the sphere
+      sphere.position.x = 10;
+      sphere.position.y = 5;
+      sphere.position.z = 10;
+      sphere.castShadow = true;
+
+      // add the sphere to the scene
+      scene.add(sphere);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = -20;
+      camera.position.y = 15;
+      camera.position.z = 45;
+      //        camera.position.x = -120;
+      //        camera.position.y = 165;
+      //        camera.position.z = 145;
+      camera.lookAt(new Three.Vector3(10, 0, 0));
+
+
+      // add spotlight for a bit of light
+      var spotLight0 = new Three.SpotLight(0xcccccc);
+      spotLight0.position.set(-40, 60, -10);
+      spotLight0.lookAt(plane);
+      scene.add(spotLight0);
+
+
+      // var target = new Three.Object3D();
+      // target.position.set(5, 0, 0)
+
+      var hemiLight = new Three.HemisphereLight(0x0000ff, 0x00ff00, 0.6);
+      hemiLight.position.set(0, 500, 0);
+      scene.add(hemiLight);
+
+
+      var pointColor = '#ffffff';
+      //    var dirLight = new THREE.SpotLight( pointColor);
+      var dirLight = new Three.DirectionalLight(pointColor);
+      dirLight.position.set(30, 10, -50);
+      dirLight.castShadow = true;
+      //        dirLight.shadowCameraNear = 0.1;
+      //        dirLight.shadowCameraFar = 100;
+      //        dirLight.shadowCameraFov = 50;
+      dirLight.target = plane;
+      dirLight.shadowCameraNear = 0.1;
+      dirLight.shadowCameraFar = 200;
+      dirLight.shadowCameraLeft = -50;
+      dirLight.shadowCameraRight = 50;
+      dirLight.shadowCameraTop = 50;
+      dirLight.shadowCameraBottom = -50;
+      dirLight.shadowMapWidth = 2048;
+      dirLight.shadowMapHeight = 2048;
+
+
+      scene.add(dirLight);
+
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      // call the render function
+      var step = 0;
+
+      // used to determine the switch point for the light animation
+      var invert = 1;
+      var phase = 0;
+
+      var controls = new function() {
+        this.rotationSpeed = 0.03;
+        this.bouncingSpeed = 0.03;
+
+        this.hemisphere = true;
+        this.color = 0x00ff00;
+        this.skyColor = 0x0000ff;
+        this.intensity = 0.6;
+
+      }();
+
+      var gui = new dat.GUI();
+
+      gui.add(controls, 'hemisphere').onChange(function(e) {
+
+        if (!e) {
+          hemiLight.intensity = 0;
+        } else {
+          hemiLight.intensity = controls.intensity;
+        }
+      });
+      gui.addColor(controls, 'color').onChange(function(e) {
+        hemiLight.groundColor = new Three.Color(e);
+      });
+      gui.addColor(controls, 'skyColor').onChange(function(e) {
+        hemiLight.color = new Three.Color(e);
+      });
+      gui.add(controls, 'intensity', 0, 5).onChange(function(e) {
+        hemiLight.intensity = e;
+      });
+
+      render();
+
+      function render() {
+        stats.update();
+        // rotate the cube around its axes
+        cube.rotation.x += controls.rotationSpeed;
+        cube.rotation.y += controls.rotationSpeed;
+        cube.rotation.z += controls.rotationSpeed;
+
+        // bounce the sphere up and down
+        step += controls.bouncingSpeed;
+        sphere.position.x = 20 + (10 * (Math.cos(step)));
+        sphere.position.y = 2 + (10 * Math.abs(Math.sin(step)));
+
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        var stats = new Stats();
+
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
     //  环境光demo
     initAmbientLight() {
       const stats = initStats();
