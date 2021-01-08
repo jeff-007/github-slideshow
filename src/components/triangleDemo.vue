@@ -22,11 +22,14 @@ import * as Three from 'three';
 const TWEEN = require('@tweenjs/tween.js')
 import C from '@/canvas/utils.js'
 import { Ball } from '@/canvas/ball.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import * as Stats from 'three/examples/js/libs/stats.min.js'
 import * as dat from 'three/examples/jsm/libs/dat.gui.module.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Projector } from 'three/examples/jsm/renderers/Projector.js'
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { SceneUtils } from 'three/examples/jsm/utils/SceneUtils.js'
 
 export default {
   name: 'TriangleDemo',
@@ -41,9 +44,249 @@ export default {
   computed: {},
   created() {},
   mounted() {
-    this.getSelectObject()
+    this.initOrbit()
   },
   methods: {
+    initOrbit() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0x000, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+      webGLRenderer.shadowMap.enabled = true;
+
+      const sphere = createMesh(new Three.SphereGeometry(20, 40, 40));
+      // add the sphere to the scene
+      scene.add(sphere);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = -20;
+      camera.position.y = 30;
+      camera.position.z = 40;
+      camera.lookAt(new Three.Vector3(0, 0, 0));
+
+      const orbitControls = new OrbitControls(camera, webGLRenderer.domElement);
+      orbitControls.autoRotate = true;
+      const clock = new Three.Clock();
+
+      const ambiLight = new Three.AmbientLight(0x111111);
+      scene.add(ambiLight);
+      const spotLight = new Three.DirectionalLight(0xffffff);
+      spotLight.position.set(-20, 30, 40);
+      spotLight.intensity = 1.5;
+      scene.add(spotLight);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+      // call the render function
+      const step = 0;
+
+      render();
+
+      function createMesh(geom) {
+        // const planetTexture = Three.ImageUtils.loadTexture('../assets/textures/planets/mars_1k_color.jpg');
+        const normalTexture = Three.ImageUtils.loadTexture('../assets/textures/planets/mars_1k_normal.jpg');
+
+        const textLoader = new Three.TextureLoader()
+        const planetTexture = textLoader.load('../assets/textures/planets/mars_1k_color.jpg');
+        console.log(planetTexture)
+
+        planetTexture.wrapS = Three.RepeatWrapping;
+        planetTexture.wrapT = Three.RepeatWrapping;
+        planetTexture.repeat.set(40, 40);
+
+        const planeMaterial = new Three.MeshLambertMaterial({ map: planetTexture });
+
+        // const planetMaterial = new Three.MeshPhongMaterial({ map: planetTexture, bumpMap: normalTexture });
+
+
+        const wireFrameMat = new Three.MeshBasicMaterial();
+        wireFrameMat.wireframe = true;
+
+        // create a multimaterial
+        const mesh = new Three.Mesh(geom, planeMaterial);
+        // const mesh = SceneUtils.createMultiMaterialObject(geom, [planeMaterial, wireFrameMat]);
+        return mesh;
+      }
+
+      function render() {
+        stats.update();
+        const delta = clock.getDelta();
+        orbitControls.update(delta);
+
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        webGLRenderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        const stats = new Stats();
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+        return stats;
+      }
+    },
+    //  ?未完成
+    initTweenPoint() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0x000, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+      webGLRenderer.shadowMap.enabled = true;
+
+      // position and point the camera to the center of the scene
+      camera.position.x = 10;
+      camera.position.y = 10;
+      camera.position.z = 10;
+      camera.lookAt(new Three.Vector3(0, -2, 0));
+
+      // add spotlight for the shadows
+      const spotLight = new Three.SpotLight(0xffffff);
+      spotLight.position.set(20, 20, 20);
+      scene.add(spotLight);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+      // call the render function
+      const step = 0;
+
+
+      // setup the control gui
+      const controls = new function() {
+        // we need the first child, since it's a multimaterial
+      }();
+
+      let pointCloud = new Three.Object3D();
+      let loadedGeometry;
+
+
+      // create a tween
+      // http://sole.github.io/tween.js/examples/03_graphs.html
+      const posSrc = { pos: 1 };
+      const tween = new TWEEN.Tween(posSrc).to({ pos: 0 }, 5000);
+      tween.easing(TWEEN.Easing.Sinusoidal.InOut);
+
+      const tweenBack = new TWEEN.Tween(posSrc).to({ pos: 1 }, 5000);
+      tweenBack.easing(TWEEN.Easing.Sinusoidal.InOut);
+
+      tween.chain(tweenBack);
+      tweenBack.chain(tween);
+
+
+      const onUpdate = function() {
+        let count = 0;
+        const pos = this.pos;
+
+        loadedGeometry.groups.forEach(function(e) {
+          const newY = ((e.y + 3.22544) * pos) - 3.22544;
+          pointCloud.geometry.groups[count++].set(e.x, newY, e.z);
+        });
+
+        pointCloud.sortParticles = true;
+      };
+
+      tween.onUpdate(onUpdate);
+      tweenBack.onUpdate(onUpdate);
+
+
+      const gui = new dat.GUI();
+
+
+      const loader = new PLYLoader();
+
+      loader.load('../assets/models/test.ply', function(geometry) {
+        loadedGeometry = geometry.clone();
+        console.log('===');
+        console.log(loadedGeometry)
+
+        const material = new Three.PointCloudMaterial({
+          color: 0xffffff,
+          size: 0.4,
+          opacity: 0.6,
+          transparent: true,
+          blending: Three.AdditiveBlending,
+          map: generateSprite()
+        });
+
+        pointCloud = new Three.PointCloud(geometry, material);
+        pointCloud.sortParticles = true;
+
+        tween.start();
+        scene.add(pointCloud);
+      });
+
+
+      render();
+
+      // from THREE.js examples
+      function generateSprite() {
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+
+        const context = canvas.getContext('2d');
+        const gradient = context.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(0.2, 'rgba(0,255,255,1)');
+        gradient.addColorStop(0.4, 'rgba(0,0,64,1)');
+        gradient.addColorStop(1, 'rgba(0,0,0,1)');
+
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        const texture = new Three.Texture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+
+      }
+
+      function render() {
+        stats.update();
+        TWEEN.update();
+        requestAnimationFrame(render);
+        webGLRenderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        const stats = new Stats();
+        stats.setMode(0); // 0: fps, 1: ms
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
     //  使用Projector和Three.Raycaster来检测是否使用鼠标点击了某个对象
     getSelectObject() {
       const stats = initStats();
@@ -59,6 +302,7 @@ export default {
 
       renderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true
 
       document.addEventListener('mousedown', onDocumentMouseDown, false);
       document.addEventListener('mousemove', onDocumentMouseMove, false);
@@ -101,6 +345,7 @@ export default {
       sphere.position.z = 2;
       // add the sphere to the scene
       scene.add(sphere);
+      sphere.castShadow = true
 
       const cylinderGeometry = new Three.CylinderGeometry(2, 2, 20);
       const cylinderMaterial = new Three.MeshLambertMaterial({ color: 0x77ff77 });
@@ -124,6 +369,7 @@ export default {
       // add spotlight for the shadows
       const spotLight = new Three.SpotLight(0xffffff);
       spotLight.position.set(-40, 60, -10);
+      spotLight.castShadow = true
 
       scene.add(spotLight);
 
@@ -141,7 +387,7 @@ export default {
         this.showRay = false;
       }();
 
-      let gui = new dat.GUI();
+      const gui = new dat.GUI();
       gui.add(controls, 'rotationSpeed', 0, 0.5);
       gui.add(controls, 'bouncingSpeed', 0, 0.5);
       gui.add(controls, 'scalingSpeed', 0, 0.5);
@@ -166,9 +412,9 @@ export default {
         // scale the cylinder
 
         scalingStep += controls.scalingSpeed;
-        let scaleX = Math.abs(Math.sin(scalingStep / 4));
-        let scaleY = Math.abs(Math.cos(scalingStep / 5));
-        let scaleZ = Math.abs(Math.sin(scalingStep / 7));
+        const scaleX = Math.abs(Math.sin(scalingStep / 4));
+        const scaleY = Math.abs(Math.cos(scalingStep / 5));
+        const scaleZ = Math.abs(Math.sin(scalingStep / 7));
         cylinder.scale.set(scaleX, scaleY, scaleZ);
 
         // render using requestAnimationFrame
@@ -177,21 +423,22 @@ export default {
 
       }
 
-      let projector = new Projector();
+      const projector = new Projector();
       let tube;
 
       function onDocumentMouseDown(event) {
-
+        //  通过鼠标点击的位置计算raycaster所需要的点的位置，以屏幕中心为原点，x和y值的范围均为-1到1
+        //  点击位置距离屏幕左上角距离/屏幕的大小 得出点击位置占全屏幕宽的百分比，转换成在屏幕中心为原点，-1到1范围内的坐标
         let vector = new Three.Vector3((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 0.5);
+
         vector = vector.unproject(camera);
 
-        let raycaster = new Three.Raycaster(camera.position, vector.sub(camera.position).normalize());
+        const raycaster = new Three.Raycaster(camera.position, vector.sub(camera.position).normalize());
 
-        let intersects = raycaster.intersectObjects([sphere, cylinder, cube]);
+        const intersects = raycaster.intersectObjects([sphere, cylinder, cube]);
 
         if (intersects.length > 0) {
 
-          console.log(intersects[0]);
 
           intersects[0].object.material.transparent = true;
           intersects[0].object.material.opacity = 0.1;
@@ -203,17 +450,17 @@ export default {
           let vector = new Three.Vector3((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 0.5);
           vector = vector.unproject(camera);
 
-          let raycaster = new Three.Raycaster(camera.position, vector.sub(camera.position).normalize());
-          let intersects = raycaster.intersectObjects([sphere, cylinder, cube]);
+          const raycaster = new Three.Raycaster(camera.position, vector.sub(camera.position).normalize());
+          const intersects = raycaster.intersectObjects([sphere, cylinder, cube]);
 
           if (intersects.length > 0) {
 
-            let points = [];
+            const points = [];
             points.push(new Three.Vector3(-30, 39.8, 30));
             points.push(intersects[0].point);
 
-            let mat = new Three.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 });
-            let tubeGeometry = new Three.TubeGeometry(new Three.SplineCurve3(points), 60, 0.001);
+            const mat = new Three.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 });
+            const tubeGeometry = new Three.TubeGeometry(new Three.SplineCurve3(points), 60, 0.001);
 
             if (tube) scene.remove(tube);
 
@@ -227,7 +474,7 @@ export default {
 
       function initStats() {
 
-        let stats = new Stats();
+        const stats = new Stats();
 
         stats.setMode(0); // 0: fps, 1: ms
 
