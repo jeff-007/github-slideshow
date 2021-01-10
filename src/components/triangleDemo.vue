@@ -30,6 +30,8 @@ import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { SceneUtils } from 'three/examples/jsm/utils/SceneUtils.js'
+import { DDSLoader } from 'three/examples/jsm/loaders/DDSLoader.js'
+import { TextureLoader } from 'three/src/loaders/TextureLoader'
 
 export default {
   name: 'TriangleDemo',
@@ -44,9 +46,294 @@ export default {
   computed: {},
   created() {},
   mounted() {
-    this.initOrbit()
+      this.bumpTexture()
   },
   methods: {
+      bumpTexture() {
+          let stats = initStats();
+
+          // create a scene, that will hold all our elements such as objects, cameras and lights.
+          let scene = new Three.Scene();
+
+          // create a camera, which defines where we're looking at.
+          let camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+          // create a render and set the size
+          let webGLRenderer = new Three.WebGLRenderer();
+          webGLRenderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+          webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+          webGLRenderer.shadowMapEnabled = true;
+
+          let sphere1 = createMesh(new Three.BoxGeometry(15, 15, 2), "");
+          sphere1.rotation.y = -0.5;
+          sphere1.position.x = 12;
+          scene.add(sphere1);
+
+          let sphere2 = createMesh(new Three.BoxGeometry(15, 15, 2), "stone.jpg", "stone-bump.jpg");
+          sphere2.rotation.y = 0.5;
+          sphere2.position.x = -12;
+          scene.add(sphere2);
+          console.log(sphere2.geometry.faceVertexUvs);
+
+          let floorTex = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37');
+          let plane = new Three.Mesh(new Three.BoxGeometry(200, 100, 0.1, 30), new Three.MeshPhongMaterial({
+              color: 0x3c3c3c,
+              map: floorTex
+          }));
+          plane.position.y = -7.5;
+          plane.rotation.x = -0.5 * Math.PI;
+          scene.add(plane);
+
+          // position and point the camera to the center of the scene
+          camera.position.x = 0;
+          camera.position.y = 12;
+          camera.position.z = 28;
+          camera.lookAt(new Three.Vector3(0, 0, 0));
+
+          let ambiLight = new Three.AmbientLight(0x242424);
+          scene.add(ambiLight);
+
+          let light = new Three.SpotLight();
+          light.position.set(0, 30, 30);
+          light.intensity = 1.2;
+          scene.add(light);
+
+          // add the output of the renderer to the html element
+          document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+          // call the render function
+          let step = 0;
+          // setup the control gui
+          let controls = new function () {
+              this.bumpScale = 0.2;
+              this.changeTexture = "weave";
+              this.rotate = false;
+
+              this.changeTexture = function (e) {
+                  let texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+                  sphere2.material.map = texture;
+                  sphere1.material.map = texture;
+
+                  let bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+                  sphere2.material.bumpMap = bump;
+              };
+
+              this.updateBump = function (e) {
+                  console.log(sphere2.material.bumpScale);
+                  sphere2.material.bumpScale = e;
+              }
+          };
+
+
+          let gui = new dat.GUI();
+          render();
+
+          function createMesh(geom, imageFile, bump) {
+              let texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+              geom.computeVertexNormals();
+              let mat = new Three.MeshPhongMaterial();
+              mat.map = texture;
+
+              if (bump) {
+                  let bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+                  mat.bumpMap = bump;
+                  mat.bumpScale = 0.2;
+                  console.log('d');
+              }
+
+
+              // create a multimaterial
+              let mesh = new Three.Mesh(geom, mat);
+
+              return mesh;
+          }
+
+          function render() {
+              stats.update();
+
+              if (controls.rotate) {
+                  sphere1.rotation.y -= 0.01;
+                  sphere2.rotation.y += 0.01;
+              }
+
+//            sphere1.rotation.y=step+=0.01;
+//            sphere1.rotation.x=step;
+//            sphere2.rotation.y=step;
+//            sphere2.rotation.x=step;
+
+              // render using requestAnimationFrame
+              requestAnimationFrame(render);
+              webGLRenderer.render(scene, camera);
+          }
+
+          function initStats() {
+
+              var stats = new Stats();
+              stats.setMode(0); // 0: fps, 1: ms
+
+              // Align top-left
+              stats.domElement.style.position = 'absolute';
+              stats.domElement.style.left = '0px';
+              stats.domElement.style.top = '0px';
+
+              document.getElementById('container').appendChild(stats.domElement);
+
+              return stats;
+          }
+      },
+    morphTarget() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+      // create a render and set the size
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+      webGLRenderer.shadowMapEnabled = true;
+
+      // position and point the camera to the center of the scene
+      camera.position.x = 250;
+      camera.position.y = 250;
+      camera.position.z = 350;
+      camera.lookAt(new Three.Vector3(100, 50, 0));
+
+
+      // add spotlight for the shadows
+      const spotLight = new Three.DirectionalLight(0xffffff);
+      spotLight.position.set(300, 200, 300);
+      spotLight.intensity = 1;
+      scene.add(spotLight);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+      // call the render function
+      const step = 0;
+
+
+      // setup the control gui
+      var controls = new function() {
+        this.keyframe = 0;
+      }();
+
+      var gui = new dat.GUI();
+      gui.add(controls, 'keyframe', 0, 15).step(1).onChange(function(e) {
+        showFrame(e);
+      });
+      var mesh;
+      var meshAnim;
+      var frames = [];
+      var currentMesh;
+      var clock = new Three.Clock();
+
+      // var loader = new Three.JSONLoader();
+      const loader = new Three.ObjectLoader();
+      loader.load('../assets/models/horse.json', function(object) {
+        scene.add(object)
+      })
+      // loader.load('../assets/models/horse.json', function(geometry) {
+      //
+      //   var mat = new Three.MeshLambertMaterial(
+      //     {
+      //       morphTargets: true,
+      //       vertexColors: Three.FaceColors
+      //     });
+      //
+      //
+      //   var mat2 = new Three.MeshLambertMaterial(
+      //     { color: 0xffffff, vertexColors: Three.FaceColors });
+      //
+      //   mesh = new Three.Mesh(geometry, mat);
+      //   mesh.position.x = -100;
+      //   frames.push(mesh);
+      //   currentMesh = mesh;
+      //   morphColorsToFaceColors(geometry);
+      //
+      //   mesh.geometry.morphTargets.forEach(function(e) {
+      //     var geom = new Three.Geometry();
+      //     geom.vertices = e.vertices;
+      //     geom.faces = geometry.faces;
+      //
+      //
+      //     var morpMesh = new Three.Mesh(geom, mat2);
+      //     frames.push(morpMesh);
+      //     morpMesh.position.x = -100;
+      //
+      //   });
+      //
+      //   geometry.computeVertexNormals();
+      //   geometry.computeFaceNormals();
+      //   geometry.computeMorphNormals();
+      //
+      //   meshAnim = new Three.MorphAnimMesh(geometry, mat);
+      //   meshAnim.duration = 1000;
+      //   meshAnim.position.x = 200;
+      //   meshAnim.position.z = 0;
+      //
+      //   scene.add(meshAnim);
+      //
+      //   showFrame(0);
+      //
+      // });
+
+      function showFrame(e) {
+        scene.remove(currentMesh);
+        scene.add(frames[e]);
+        currentMesh = frames[e];
+        console.log(currentMesh);
+      }
+
+      function morphColorsToFaceColors(geometry) {
+
+        if (geometry.morphColors && geometry.morphColors.length) {
+
+          var colorMap = geometry.morphColors[0];
+          for (var i = 0; i < colorMap.colors.length; i++) {
+            geometry.faces[i].color = colorMap.colors[i];
+            geometry.faces[i].color.offsetHSL(0, 0.3, 0);
+          }
+        }
+      }
+
+      render();
+
+      function render() {
+        stats.update();
+
+        var delta = clock.getDelta();
+        webGLRenderer.clear();
+        if (meshAnim) {
+          meshAnim.updateAnimation(delta * 1000);
+          meshAnim.rotation.y += 0.01;
+        }
+        // render using requestAnimationFrame
+
+
+        requestAnimationFrame(render);
+        webGLRenderer.render(scene, camera);
+      }
+
+      function initStats() {
+
+        var stats = new Stats();
+        stats.setMode(0); // 0: fps, 1: ms
+
+
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
+
+        document.getElementById('container').appendChild(stats.domElement);
+
+        return stats;
+      }
+    },
     initOrbit() {
       const stats = initStats();
 
@@ -96,12 +383,12 @@ export default {
         const normalTexture = Three.ImageUtils.loadTexture('../assets/textures/planets/mars_1k_normal.jpg');
 
         const textLoader = new Three.TextureLoader()
-        const planetTexture = textLoader.load('../assets/textures/planets/mars_1k_color.jpg');
+        const planetTexture = textLoader.load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37');
         console.log(planetTexture)
 
         planetTexture.wrapS = Three.RepeatWrapping;
         planetTexture.wrapT = Three.RepeatWrapping;
-        planetTexture.repeat.set(40, 40);
+        planetTexture.repeat.set(1, 1);
 
         const planeMaterial = new Three.MeshLambertMaterial({ map: planetTexture });
 
