@@ -46,7 +46,7 @@ export default {
   computed: {},
   created() {},
   mounted() {
-      this.bumpTexture()
+      // this.bumpTexture()
   },
   methods: {
       bumpTexture() {
