@@ -61,3 +61,5 @@ service.interceptors.response.use((response) => {
   // Message.error('网络请求异常，请稍后重试!');
   return Promise.reject(error)
 });
+
+export default service;

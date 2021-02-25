@@ -1,3 +1,4 @@
+// 主要使用src/request中的封装写法, 该处的配置仅作为对比参考
 /**
  * request.js
  * 通过promise对axios做二次封装，针对用户端参数，做灵活配置
