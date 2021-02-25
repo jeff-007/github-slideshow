@@ -13,7 +13,7 @@ import { Message, Loading, MessageBox } from 'element-ui'
  * @param mock 本次是否请求mock而非线上
  * @param error 本次是否显示错误
  */
-function request(url = '', params = {}, options = { loading: true, mock: false, error: true }, method = 'post') {
+function request(url = '', params = {}, method = 'post', options = { loading: true, mock: false, error: true }) {
   //  此处对登录权限过期的情况进行处理
   const isNeedLogin = false
   const isExpired = false

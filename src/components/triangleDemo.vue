@@ -47,9 +47,19 @@ export default {
   created() {},
   mounted() {
       // this.bumpTexture()
-
+      this.testAxios()
   },
   methods: {
+      testAxios() {
+        const postData = {
+            mid: '123',
+            name: 'jeff'
+        }
+        const that = this;
+        this.$api.moduleOne.testMethod(postData).then(res => {
+            console.log(res)
+        }).catch(error => {})
+      },
       bumpTexture() {
           let stats = initStats();
 
