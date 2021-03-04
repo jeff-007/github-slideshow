@@ -1,14 +1,14 @@
 <template>
     <div>
-<!--        <canvas id="canvasElem2"></canvas>-->
-<!--        &lt;!&ndash; 小球散落 &ndash;&gt;-->
-<!--&lt;!&ndash;        <canvas id="canvasElem1"></canvas>&ndash;&gt;-->
+        <canvas id="canvasElem2"></canvas>
+        <!-- 小球散落 -->
+<!--        <canvas id="canvasElem1"></canvas>-->
 
-<!--        &lt;!&ndash; 粒子花园 &ndash;&gt;-->
-<!--        <canvas id="canvasElem3"></canvas>-->
+        <!-- 粒子花园 -->
+        <canvas id="canvasElem3"></canvas>
 
-<!--        &lt;!&ndash; 3d星空环绕 &ndash;&gt;-->
-<!--        <canvas id="canvasElem4"></canvas>-->
+        <!-- 3d星空环绕 -->
+        <canvas id="canvasElem4"></canvas>
 
         <!-- 三维正方体 -->
         <div class="container" id="container"></div>
@@ -46,152 +46,141 @@ export default {
   computed: {},
   created() {},
   mounted() {
-      // this.bumpTexture()
-      this.testAxios()
+    // this.bumpTexture()
   },
   methods: {
-      testAxios() {
-        const postData = {
-            mid: '123',
-            name: 'jeff'
+    bumpTexture() {
+      const stats = initStats();
+
+      // create a scene, that will hold all our elements such as objects, cameras and lights.
+      const scene = new Three.Scene();
+
+      // create a camera, which defines where we're looking at.
+      const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // create a render and set the size
+      const webGLRenderer = new Three.WebGLRenderer();
+      webGLRenderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
+      webGLRenderer.setSize(window.innerWidth, window.innerHeight);
+      webGLRenderer.shadowMapEnabled = true;
+
+      const sphere1 = createMesh(new Three.BoxGeometry(15, 15, 2), '');
+      sphere1.rotation.y = -0.5;
+      sphere1.position.x = 12;
+      scene.add(sphere1);
+
+      const sphere2 = createMesh(new Three.BoxGeometry(15, 15, 2), 'stone.jpg', 'stone-bump.jpg');
+      sphere2.rotation.y = 0.5;
+      sphere2.position.x = -12;
+      scene.add(sphere2);
+      console.log(sphere2.geometry.faceVertexUvs);
+
+      const floorTex = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37');
+      const plane = new Three.Mesh(new Three.BoxGeometry(200, 100, 0.1, 30), new Three.MeshPhongMaterial({
+        color: 0x3c3c3c,
+        map: floorTex
+      }));
+      plane.position.y = -7.5;
+      plane.rotation.x = -0.5 * Math.PI;
+      scene.add(plane);
+
+      // position and point the camera to the center of the scene
+      camera.position.x = 0;
+      camera.position.y = 12;
+      camera.position.z = 28;
+      camera.lookAt(new Three.Vector3(0, 0, 0));
+
+      const ambiLight = new Three.AmbientLight(0x242424);
+      scene.add(ambiLight);
+
+      const light = new Three.SpotLight();
+      light.position.set(0, 30, 30);
+      light.intensity = 1.2;
+      scene.add(light);
+
+      // add the output of the renderer to the html element
+      document.getElementById('container').appendChild(webGLRenderer.domElement);
+
+      // call the render function
+      const step = 0;
+      // setup the control gui
+      const controls = new function() {
+        this.bumpScale = 0.2;
+        this.changeTexture = 'weave';
+        this.rotate = false;
+
+        this.changeTexture = function(e) {
+          const texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+          sphere2.material.map = texture;
+          sphere1.material.map = texture;
+
+          const bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+          sphere2.material.bumpMap = bump;
+        };
+
+        this.updateBump = function(e) {
+          console.log(sphere2.material.bumpScale);
+          sphere2.material.bumpScale = e;
         }
-        const that = this;
-        this.$api.moduleOne.testMethod(postData).then(res => {
-            console.log(res)
-        }).catch(error => {})
-      },
-      bumpTexture() {
-          let stats = initStats();
-
-          // create a scene, that will hold all our elements such as objects, cameras and lights.
-          let scene = new Three.Scene();
-
-          // create a camera, which defines where we're looking at.
-          let camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-          // create a render and set the size
-          let webGLRenderer = new Three.WebGLRenderer();
-          webGLRenderer.setClearColor(new Three.Color(0xEEEEEE, 1.0));
-          webGLRenderer.setSize(window.innerWidth, window.innerHeight);
-          webGLRenderer.shadowMapEnabled = true;
-
-          let sphere1 = createMesh(new Three.BoxGeometry(15, 15, 2), "");
-          sphere1.rotation.y = -0.5;
-          sphere1.position.x = 12;
-          scene.add(sphere1);
-
-          let sphere2 = createMesh(new Three.BoxGeometry(15, 15, 2), "stone.jpg", "stone-bump.jpg");
-          sphere2.rotation.y = 0.5;
-          sphere2.position.x = -12;
-          scene.add(sphere2);
-          console.log(sphere2.geometry.faceVertexUvs);
-
-          let floorTex = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37');
-          let plane = new Three.Mesh(new Three.BoxGeometry(200, 100, 0.1, 30), new Three.MeshPhongMaterial({
-              color: 0x3c3c3c,
-              map: floorTex
-          }));
-          plane.position.y = -7.5;
-          plane.rotation.x = -0.5 * Math.PI;
-          scene.add(plane);
-
-          // position and point the camera to the center of the scene
-          camera.position.x = 0;
-          camera.position.y = 12;
-          camera.position.z = 28;
-          camera.lookAt(new Three.Vector3(0, 0, 0));
-
-          let ambiLight = new Three.AmbientLight(0x242424);
-          scene.add(ambiLight);
-
-          let light = new Three.SpotLight();
-          light.position.set(0, 30, 30);
-          light.intensity = 1.2;
-          scene.add(light);
-
-          // add the output of the renderer to the html element
-          document.getElementById('container').appendChild(webGLRenderer.domElement);
-
-          // call the render function
-          let step = 0;
-          // setup the control gui
-          let controls = new function () {
-              this.bumpScale = 0.2;
-              this.changeTexture = "weave";
-              this.rotate = false;
-
-              this.changeTexture = function (e) {
-                  let texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
-                  sphere2.material.map = texture;
-                  sphere1.material.map = texture;
-
-                  let bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
-                  sphere2.material.bumpMap = bump;
-              };
-
-              this.updateBump = function (e) {
-                  console.log(sphere2.material.bumpScale);
-                  sphere2.material.bumpScale = e;
-              }
-          };
+      }();
 
 
-          let gui = new dat.GUI();
-          render();
+      const gui = new dat.GUI();
+      render();
 
-          function createMesh(geom, imageFile, bump) {
-              let texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
-              geom.computeVertexNormals();
-              let mat = new Three.MeshPhongMaterial();
-              mat.map = texture;
+      function createMesh(geom, imageFile, bump) {
+        const texture = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+        geom.computeVertexNormals();
+        const mat = new Three.MeshPhongMaterial();
+        mat.map = texture;
 
-              if (bump) {
-                  let bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
-                  mat.bumpMap = bump;
-                  mat.bumpScale = 0.2;
-                  console.log('d');
-              }
+        if (bump) {
+          const bump = new TextureLoader().load('http://testt2.wmnetwork.cc/res/index/banners/meet_cloud.png?ver=4.9.37')
+          mat.bumpMap = bump;
+          mat.bumpScale = 0.2;
+          console.log('d');
+        }
 
 
-              // create a multimaterial
-              let mesh = new Three.Mesh(geom, mat);
+        // create a multimaterial
+        const mesh = new Three.Mesh(geom, mat);
 
-              return mesh;
-          }
+        return mesh;
+      }
 
-          function render() {
-              stats.update();
+      function render() {
+        stats.update();
 
-              if (controls.rotate) {
-                  sphere1.rotation.y -= 0.01;
-                  sphere2.rotation.y += 0.01;
-              }
+        if (controls.rotate) {
+          sphere1.rotation.y -= 0.01;
+          sphere2.rotation.y += 0.01;
+        }
 
-//            sphere1.rotation.y=step+=0.01;
-//            sphere1.rotation.x=step;
-//            sphere2.rotation.y=step;
-//            sphere2.rotation.x=step;
+        //            sphere1.rotation.y=step+=0.01;
+        //            sphere1.rotation.x=step;
+        //            sphere2.rotation.y=step;
+        //            sphere2.rotation.x=step;
 
-              // render using requestAnimationFrame
-              requestAnimationFrame(render);
-              webGLRenderer.render(scene, camera);
-          }
+        // render using requestAnimationFrame
+        requestAnimationFrame(render);
+        webGLRenderer.render(scene, camera);
+      }
 
-          function initStats() {
+      function initStats() {
 
-              var stats = new Stats();
-              stats.setMode(0); // 0: fps, 1: ms
+        var stats = new Stats();
+        stats.setMode(0); // 0: fps, 1: ms
 
-              // Align top-left
-              stats.domElement.style.position = 'absolute';
-              stats.domElement.style.left = '0px';
-              stats.domElement.style.top = '0px';
+        // Align top-left
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.top = '0px';
 
-              document.getElementById('container').appendChild(stats.domElement);
+        document.getElementById('container').appendChild(stats.domElement);
 
-              return stats;
-          }
-      },
+        return stats;
+      }
+    },
     morphTarget() {
       const stats = initStats();
 

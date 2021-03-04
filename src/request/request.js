@@ -1,8 +1,6 @@
-
 import instance from '../request/interceptor.js'
 import QS from 'qs'
 import { Message, Loading, MessageBox } from 'element-ui'
-
 
 /**
  * 核心函数，可通过它处理一切请求数据，并做横向扩展
