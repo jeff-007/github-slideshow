@@ -3,7 +3,7 @@ const path = require('path')
 function resolve(dir) {
   return path.join(__dirname, dir)
 }
-const port = process.env.port || process.env.npm_config_port || 9527 // dev port
+const port = process.env.port || process.env.npm_config_port || 9520 // dev port
 module.exports = {
   /**
    * You will need to set publicPath if you plan to deploy your site under a sub path,
