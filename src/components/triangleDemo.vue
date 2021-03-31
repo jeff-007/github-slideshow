@@ -20,6 +20,7 @@
     import * as Three from 'three';
     // import Three from '@/three/vtkLoader.js'
     const TWEEN = require('@tweenjs/tween.js')
+    const Physijs = require('physijs')
     import C from '@/canvas/utils.js'
     import { Ball } from '@/canvas/ball.js';
     import * as Stats from 'three/examples/js/libs/stats.min.js'
@@ -55,7 +56,10 @@
             }
         },
         computed: {},
-        created() {},
+        created() {
+            let scene = new Physijs.Scene()
+            console.log(scene)
+        },
         mounted() {
             this.initStarrySky()
         },

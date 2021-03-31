@@ -24,7 +24,7 @@ module.exports = {
     overlay: {
       warnings: false,
       errors: true
-    },
+    }
     // proxy: {
     //   '/api': {
     //     target: 'https://project.moja.vip',
@@ -47,6 +47,15 @@ module.exports = {
       }
     }
   },
+  chainWebpack: config => {
+    // GraphQL Loader
+    config.module
+        .rule('worker-loader')
+        .test(/\.worker\.js$/)
+        .use('worker-loader')
+        .loader('worker-loader')
+        .end()
+  },
   css: {
     extract: true,
     sourceMap: false,
@@ -56,5 +65,5 @@ module.exports = {
         additionalData: `@import "~@/styles/variables.scss";`
       }
     }
-  },
+  }
 }
