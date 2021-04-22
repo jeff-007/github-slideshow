@@ -33,6 +33,7 @@
     import { SceneUtils } from 'three/examples/jsm/utils/SceneUtils.js'
     import { DDSLoader } from 'three/examples/jsm/loaders/DDSLoader.js'
     import { TextureLoader } from 'three/src/loaders/TextureLoader'
+    import { DragControls } from 'three/examples/jsm/controls/DragControls.js'
 
     // 后期处理相关
     import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -44,6 +45,8 @@
     import { SepiaShader } from 'three/examples/jsm/shaders/SepiaShader.js'
     import { ColorifyShader } from 'three/examples/jsm/shaders/ColorifyShader.js'
     import { MaskPass, ClearMaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
+    import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls.js'
+
 
     export default {
         name: 'TriangleDemo',
@@ -57,13 +60,320 @@
         },
         computed: {},
         created() {
-            let scene = new Physijs.Scene()
-            console.log(scene)
+            // let scene = new Physijs.Scene()
         },
         mounted() {
-            this.initStarrySky()
+            // this.initStarrySky()
+            // this.initSound()
+            this.initDrag()
         },
         methods: {
+            initDrag() {
+                let container;
+                let camera, scene, renderer;
+                let controls, group;
+                let enableSelection = false;
+                const objects = [];
+                const mouse = new Three.Vector2(); const raycaster = new Three.Raycaster();
+
+                init();
+
+                function init() {
+                    container = document.createElement('div');
+                    document.body.appendChild(container);
+
+                    camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 5000);
+                    camera.position.z = 1000;
+
+                    scene = new Three.Scene();
+                    scene.background = new Three.Color(0xf0f0f0);
+
+                    scene.add(new Three.AmbientLight(0x505050));
+
+                    const light = new Three.SpotLight(0xffffff, 1.5);
+                    light.position.set(0, 500, 2000);
+                    light.angle = Math.PI / 9;
+
+                    light.castShadow = true;
+                    light.shadow.camera.near = 1000;
+                    light.shadow.camera.far = 4000;
+                    light.shadow.mapSize.width = 1024;
+                    light.shadow.mapSize.height = 1024;
+
+                    scene.add(light);
+
+                    group = new Three.Group();
+                    scene.add(group);
+
+                    const geometry = new Three.BoxGeometry(40, 40, 40);
+
+                    for (let i = 0; i < 100; i++) {
+
+                        const object = new Three.Mesh(geometry, new Three.MeshLambertMaterial({ color: Math.random() * 0xffffff }));
+
+                        object.position.x = Math.random() * 1000 - 500;
+                        object.position.y = Math.random() * 600 - 300;
+                        object.position.z = Math.random() * 800 - 400;
+
+                        object.rotation.x = Math.random() * 2 * Math.PI;
+                        object.rotation.y = Math.random() * 2 * Math.PI;
+                        object.rotation.z = Math.random() * 2 * Math.PI;
+
+                        object.scale.x = Math.random() * 2 + 1;
+                        object.scale.y = Math.random() * 2 + 1;
+                        object.scale.z = Math.random() * 2 + 1;
+
+                        object.castShadow = true;
+                        object.receiveShadow = true;
+
+                        scene.add(object);
+
+                        objects.push(object);
+
+                    }
+
+                    renderer = new Three.WebGLRenderer({ antialias: true });
+                    // 设置设备像素比，通常用于避免HiDPI设备上绘图模糊
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = Three.PCFShadowMap;
+
+                    container.appendChild(renderer.domElement);
+
+                    controls = new DragControls([... objects], camera, renderer.domElement);
+                    // 拖拽过程中也进行渲染
+                    controls.addEventListener('drag', render);
+
+                    window.addEventListener('resize', onWindowResize);
+                    document.addEventListener('click', onClick);
+                    window.addEventListener('keydown', onKeyDown);
+                    window.addEventListener('keyup', onKeyUp);
+
+                    render();
+
+                }
+
+                function onWindowResize() {
+
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+
+                    render();
+
+                }
+
+                // keyCode = 16: shift键
+                function onKeyDown(event) {
+                    enableSelection = (event.keyCode === 16);
+                }
+
+                function onKeyUp() {
+                    enableSelection = false;
+                }
+
+                function onClick(event) {
+
+                    event.preventDefault();
+
+                    console.log('=====')
+                    console.log(enableSelection)
+
+                    if (enableSelection === true) {
+
+                        // 此时获取到的是通过DragControls添加的所有可拖拽对象，即循环渲染中的100个方块网格
+                        const draggableObjects = controls.getObjects();
+                        draggableObjects.length = 0;
+
+                        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                        raycaster.setFromCamera(mouse, camera);
+
+                        const intersections = raycaster.intersectObjects(objects, true);
+                        console.log('intersections: ', intersections)
+
+                        if (intersections.length > 0) {
+
+                            // 获取鼠标所指的第一个网格对象
+                            const object = intersections[ 0 ].object;
+
+                            if (group.children.includes(object) === true) {
+                                // attach ( object : Object3D ) : this
+                                // Object3D对象中的方法 attach：将object作为子级来添加到该对象中，同时保持该object的世界变换
+                                object.material.emissive.set(0x000000);
+                                scene.attach(object);
+
+                            } else {
+
+                                object.material.emissive.set(0xaaaaaa);
+                                group.attach(object);
+
+                            }
+
+                            // 以网格组的形式进行拖拽
+                            controls.transformGroup = true;
+                            draggableObjects.push(group);
+
+                        }
+                        // 拖拽单个网格对象
+                        if (group.children.length === 0) {
+                            controls.transformGroup = false;
+                            draggableObjects.push(...objects);
+                        }
+                    }
+
+                    render();
+
+                }
+
+                function render() {
+
+                    renderer.render(scene, camera);
+
+                }
+            },
+
+            initSound() {
+                let container;
+                let camera, controls, scene, renderer;
+                let light, pointLight;
+
+                let mesh;
+                let material_sphere1, material_sphere2;
+
+                const clock = new Three.Clock();
+
+                init();
+                animate();
+
+                function init() {
+                    container = document.getElementById('container');
+                    renderer = new Three.WebGLRenderer({ antialias: true });
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+
+                    camera = new Three.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 10000);
+                    camera.position.set(-200, 25, 0);
+
+                    const listener1 = new Three.AudioListener();
+                    camera.add(listener1);
+                    const listener2 = new Three.AudioListener();
+                    camera.add(listener2);
+                    const listener3 = new Three.AudioListener();
+                    camera.add(listener3);
+
+                    controls = new FirstPersonControls(camera, renderer.domElement);
+
+                    controls.movementSpeed = 10;
+                    controls.lookSpeed = 0.05;
+                    controls.noFly = false;
+                    controls.lookVertical = false;
+                    // controls.autoForward = false
+                    controls.activeLook = true
+                    controls.mouseDragOn = false
+
+                    scene = new Three.Scene();
+                    scene.fog = new Three.FogExp2(0x000000, 0.0035);
+
+                    light = new Three.DirectionalLight(0xffffff);
+                    light.position.set(0, 0.5, 1).normalize();
+                    scene.add(light);
+
+                    const cube = new Three.BoxGeometry(40, 40, 40);
+
+                    const material_1 = new Three.MeshBasicMaterial({
+                        color: 0xffffff,
+                        map: new TextureLoader().load('http://shanmao.site/assets/textures/animals/cow.png')
+                    });
+
+                    const material_2 = new Three.MeshBasicMaterial({
+                        color: 0xffffff,
+                        map: new TextureLoader().load('http://shanmao.site/assets/textures/animals/dog.jpg')
+                    });
+
+                    const material_3 = new Three.MeshBasicMaterial({
+                        color: 0xffffff,
+                        map: new TextureLoader().load('http://shanmao.site/assets/textures/animals/cat.jpg')
+                    });
+
+                    // sound spheres
+
+                    const mesh1 = new Three.Mesh(cube, material_1);
+                    mesh1.position.set(0, 20, 100);
+                    const mesh2 = new Three.Mesh(cube, material_2);
+                    mesh2.position.set(0, 20, 0);
+                    const mesh3 = new Three.Mesh(cube, material_3);
+                    mesh3.position.set(0, 20, -100);
+
+                    scene.add(mesh1);
+                    scene.add(mesh2);
+                    scene.add(mesh3);
+
+                    const posSound1 = new Three.PositionalAudio(listener1)
+                    const posSound2 = new Three.PositionalAudio(listener2)
+                    const posSound3 = new Three.PositionalAudio(listener3)
+
+                    const audioLoader = new Three.AudioLoader();
+                    audioLoader.load('http://shanmao.site/assets/audio/cow.ogg', function(buffer) {
+                        posSound1.setBuffer(buffer);
+                        posSound1.setRefDistance(30);
+                        posSound1.play();
+                        posSound1.setRolloffFactor(10);
+                        posSound1.setLoop(true)
+                    })
+
+                    audioLoader.load('http://shanmao.site/assets/audio/dog.ogg', function(buffer) {
+                        posSound2.setBuffer(buffer);
+                        posSound2.setRefDistance(30);
+                        posSound2.play();
+                        posSound2.setRolloffFactor(10);
+                        posSound2.setLoop(true)
+                    })
+
+                    audioLoader.load('http://shanmao.site/assets/audio/cat.ogg', function(buffer) {
+                        posSound3.setBuffer(buffer);
+                        posSound3.setRefDistance(30);
+                        posSound3.play();
+                        posSound3.setRolloffFactor(10);
+                        posSound3.setLoop(true)
+                    })
+
+                    // ground
+
+                    const helper = new Three.GridHelper(500, 10);
+                    // helper.color1.setHex(0x444444);
+                    // helper.color2.setHex(0x444444);
+                    helper.position.y = 0.1;
+                    scene.add(helper);
+
+                    container.innerHTML = '';
+                    container.appendChild(renderer.domElement);
+                    window.addEventListener('resize', onWindowResize, false);
+                }
+
+                function onWindowResize() {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    controls.handleResize();
+                }
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    render();
+                }
+                function render() {
+
+                    const delta = clock.getDelta();
+                    const time = clock.getElapsedTime() * 5;
+
+                    controls.update(delta);
+                    renderer.render(scene, camera);
+                }
+            },
             // 使用掩码在指定场景渲染通道
             initStarrySky() {
                 const stats = initStats();
@@ -508,7 +818,7 @@
 
                 function initStats() {
 
-                    var stats = new Stats();
+                    const stats = new Stats();
                     stats.setMode(0); // 0: fps, 1: ms
 
                     // Align top-left
@@ -557,35 +867,35 @@
 
 
                 // setup the control gui
-                var controls = new function() {
+                const controls = new function() {
                     this.keyframe = 0;
                 }();
 
-                var gui = new dat.GUI();
+                const gui = new dat.GUI();
                 gui.add(controls, 'keyframe', 0, 15).step(1).onChange(function(e) {
                     showFrame(e);
                 });
-                var mesh;
-                var meshAnim;
-                var frames = [];
-                var currentMesh;
-                var clock = new Three.Clock();
+                let mesh;
+                let meshAnim;
+                const frames = [];
+                let currentMesh;
+                const clock = new Three.Clock();
 
-                // var loader = new Three.JSONLoader();
+                // let loader = new Three.JSONLoader();
                 const loader = new Three.ObjectLoader();
                 loader.load('../assets/models/horse.json', function(object) {
                     scene.add(object)
                 })
                 // loader.load('../assets/models/horse.json', function(geometry) {
                 //
-                //   var mat = new Three.MeshLambertMaterial(
+                //   let mat = new Three.MeshLambertMaterial(
                 //     {
                 //       morphTargets: true,
                 //       vertexColors: Three.FaceColors
                 //     });
                 //
                 //
-                //   var mat2 = new Three.MeshLambertMaterial(
+                //   let mat2 = new Three.MeshLambertMaterial(
                 //     { color: 0xffffff, vertexColors: Three.FaceColors });
                 //
                 //   mesh = new Three.Mesh(geometry, mat);
@@ -595,12 +905,12 @@
                 //   morphColorsToFaceColors(geometry);
                 //
                 //   mesh.geometry.morphTargets.forEach(function(e) {
-                //     var geom = new Three.Geometry();
+                //     let geom = new Three.Geometry();
                 //     geom.vertices = e.vertices;
                 //     geom.faces = geometry.faces;
                 //
                 //
-                //     var morpMesh = new Three.Mesh(geom, mat2);
+                //     let morpMesh = new Three.Mesh(geom, mat2);
                 //     frames.push(morpMesh);
                 //     morpMesh.position.x = -100;
                 //
@@ -632,8 +942,8 @@
 
                     if (geometry.morphColors && geometry.morphColors.length) {
 
-                        var colorMap = geometry.morphColors[0];
-                        for (var i = 0; i < colorMap.colors.length; i++) {
+                        const colorMap = geometry.morphColors[0];
+                        for (let i = 0; i < colorMap.colors.length; i++) {
                             geometry.faces[i].color = colorMap.colors[i];
                             geometry.faces[i].color.offsetHSL(0, 0.3, 0);
                         }
@@ -645,7 +955,7 @@
                 function render() {
                     stats.update();
 
-                    var delta = clock.getDelta();
+                    const delta = clock.getDelta();
                     webGLRenderer.clear();
                     if (meshAnim) {
                         meshAnim.updateAnimation(delta * 1000);
@@ -660,7 +970,7 @@
 
                 function initStats() {
 
-                    var stats = new Stats();
+                    const stats = new Stats();
                     stats.setMode(0); // 0: fps, 1: ms
 
 
@@ -1164,7 +1474,7 @@
 
                 function initStats() {
 
-                    var stats = new Stats();
+                    const stats = new Stats();
                     stats.setMode(0); // 0: fps, 1: ms
 
                     // Align top-left
@@ -1210,10 +1520,10 @@
                 const planeGeometry = new Three.PlaneGeometry(14, 14, 4, 4);
 
 
-                var meshMaterial = new Three.MeshNormalMaterial({ color: 0x7777ff });
-                var sphere = new Three.Mesh(sphereGeometry, meshMaterial);
-                var cube = new Three.Mesh(cubeGeometry, meshMaterial);
-                var plane = new Three.Mesh(planeGeometry, meshMaterial);
+                const meshMaterial = new Three.MeshNormalMaterial({ color: 0x7777ff });
+                let sphere = new Three.Mesh(sphereGeometry, meshMaterial);
+                let cube = new Three.Mesh(cubeGeometry, meshMaterial);
+                let plane = new Three.Mesh(planeGeometry, meshMaterial);
 
                 // position the sphere
                 sphere.position.x = 0;
@@ -1430,18 +1740,18 @@
             },
             //  半球光，更贴近环境光
             initHemiLight() {
-                var stats = initStats();
+                const stats = initStats();
 
                 // create a scene, that will hold all our elements such as objects, cameras and lights.
-                var scene = new Three.Scene();
+                const scene = new Three.Scene();
                 scene.fog = new Three.Fog(0xaaaaaa, 0.010, 200);
 
                 // create a camera, which defines where we're looking at.
-                var camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const camera = new Three.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 
                 // create a render and set the size
-                var renderer = new Three.WebGLRenderer();
+                const renderer = new Three.WebGLRenderer();
 
                 renderer.setClearColor(new Three.Color(0xaaaaff, 1.0));
                 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1449,16 +1759,16 @@
 
 
                 // create the ground plane
-                var textureGrass = Three.ImageUtils.loadTexture('../assets/textures/ground/grasslight-big.jpg');
+                const textureGrass = Three.ImageUtils.loadTexture('../assets/textures/ground/grasslight-big.jpg');
                 textureGrass.wrapS = Three.RepeatWrapping;
                 textureGrass.wrapT = Three.RepeatWrapping;
                 textureGrass.repeat.set(4, 4);
 
 
-                var planeGeometry = new Three.PlaneGeometry(1000, 200, 20, 20);
-                var planeMaterial = new Three.MeshLambertMaterial({ map: textureGrass });
-                //        var planeMaterial = new Three.MeshLambertMaterial();
-                var plane = new Three.Mesh(planeGeometry, planeMaterial);
+                const planeGeometry = new Three.PlaneGeometry(1000, 200, 20, 20);
+                const planeMaterial = new Three.MeshLambertMaterial({ map: textureGrass });
+                //        let planeMaterial = new Three.MeshLambertMaterial();
+                const plane = new Three.Mesh(planeGeometry, planeMaterial);
                 plane.receiveShadow = true;
 
                 // rotate and position the plane
@@ -1471,9 +1781,9 @@
                 scene.add(plane);
 
                 // create a cube
-                var cubeGeometry = new Three.BoxGeometry(4, 4, 4);
-                var cubeMaterial = new Three.MeshLambertMaterial({ color: 0xff3333 });
-                var cube = new Three.Mesh(cubeGeometry, cubeMaterial);
+                const cubeGeometry = new Three.BoxGeometry(4, 4, 4);
+                const cubeMaterial = new Three.MeshLambertMaterial({ color: 0xff3333 });
+                const cube = new Three.Mesh(cubeGeometry, cubeMaterial);
                 cube.castShadow = true;
 
                 // position the cube
@@ -1484,9 +1794,9 @@
                 // add the cube to the scene
                 scene.add(cube);
 
-                var sphereGeometry = new Three.SphereGeometry(4, 25, 25);
-                var sphereMaterial = new Three.MeshLambertMaterial({ color: 0x7777ff });
-                var sphere = new Three.Mesh(sphereGeometry, sphereMaterial);
+                const sphereGeometry = new Three.SphereGeometry(4, 25, 25);
+                const sphereMaterial = new Three.MeshLambertMaterial({ color: 0x7777ff });
+                const sphere = new Three.Mesh(sphereGeometry, sphereMaterial);
 
                 // position the sphere
                 sphere.position.x = 10;
@@ -1508,23 +1818,23 @@
 
 
                 // add spotlight for a bit of light
-                var spotLight0 = new Three.SpotLight(0xcccccc);
+                const spotLight0 = new Three.SpotLight(0xcccccc);
                 spotLight0.position.set(-40, 60, -10);
                 spotLight0.lookAt(plane);
                 scene.add(spotLight0);
 
 
-                // var target = new Three.Object3D();
+                // let target = new Three.Object3D();
                 // target.position.set(5, 0, 0)
 
-                var hemiLight = new Three.HemisphereLight(0x0000ff, 0x00ff00, 0.6);
+                const hemiLight = new Three.HemisphereLight(0x0000ff, 0x00ff00, 0.6);
                 hemiLight.position.set(0, 500, 0);
                 scene.add(hemiLight);
 
 
-                var pointColor = '#ffffff';
-                //    var dirLight = new THREE.SpotLight( pointColor);
-                var dirLight = new Three.DirectionalLight(pointColor);
+                const pointColor = '#ffffff';
+                //    let dirLight = new THREE.SpotLight( pointColor);
+                const dirLight = new Three.DirectionalLight(pointColor);
                 dirLight.position.set(30, 10, -50);
                 dirLight.castShadow = true;
                 //        dirLight.shadowCameraNear = 0.1;
@@ -1548,13 +1858,13 @@
                 document.getElementById('container').appendChild(renderer.domElement);
 
                 // call the render function
-                var step = 0;
+                let step = 0;
 
                 // used to determine the switch point for the light animation
-                var invert = 1;
-                var phase = 0;
+                const invert = 1;
+                const phase = 0;
 
-                var controls = new function() {
+                const controls = new function() {
                     this.rotationSpeed = 0.03;
                     this.bouncingSpeed = 0.03;
 
@@ -1565,7 +1875,7 @@
 
                 }();
 
-                var gui = new dat.GUI();
+                const gui = new dat.GUI();
 
                 gui.add(controls, 'hemisphere').onChange(function(e) {
 
@@ -1605,7 +1915,7 @@
 
                 function initStats() {
 
-                    var stats = new Stats();
+                    const stats = new Stats();
 
                     stats.setMode(0); // 0: fps, 1: ms
 
@@ -1639,7 +1949,7 @@
                 // create the ground plane
                 const planeGeometry = new Three.PlaneGeometry(60, 20, 1, 1);
                 const planeMaterial = new Three.MeshLambertMaterial({ color: 0xffffff });
-                var plane = new Three.Mesh(planeGeometry, planeMaterial);
+                const plane = new Three.Mesh(planeGeometry, planeMaterial);
                 plane.receiveShadow = true;
 
                 // rotate and position the plane
