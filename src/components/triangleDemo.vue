@@ -12,6 +12,18 @@
 
         <!-- 三维正方体 -->
         <div class="container" id="container"></div>
+
+        <!-- pointerLocker -->
+<!--        <div id="blocker">-->
+<!--            <div id="instructions">-->
+<!--                <span style="font-size:36px">Click to play</span>-->
+<!--                <br /><br />-->
+<!--                Move: WASD<br/>-->
+<!--                Jump: SPACE<br/>-->
+<!--                Look: MOUSE-->
+<!--            </div>-->
+<!--        </div>-->
+
     </div>
 
 </template>
@@ -34,6 +46,9 @@
     import { DDSLoader } from 'three/examples/jsm/loaders/DDSLoader.js'
     import { TextureLoader } from 'three/src/loaders/TextureLoader'
     import { DragControls } from 'three/examples/jsm/controls/DragControls.js'
+    import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
+    import { Water } from 'three/examples/jsm/objects/Water.js'
+    import { Sky } from 'three/examples/jsm/objects/Sky.js'
 
     // 后期处理相关
     import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -65,9 +80,466 @@
         mounted() {
             // this.initStarrySky()
             // this.initSound()
-            this.initDrag()
+            // this.initDrag()
+            // this.initPointer()
+            this.initWater()
         },
         methods: {
+            initWater() {
+                let container, stats;
+                let camera, scene, renderer;
+                let controls, water, sun, mesh;
+
+                init();
+                animate();
+
+                function init() {
+
+                    container = document.getElementById('container');
+
+                    renderer = new Three.WebGLRenderer();
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    // ACESFilmicToneMapping常量定义了WebGLRenderer中色调映射的曝光级别toneMapping的属性
+                    // 这个属性用于在普通计算机显示器或者移动设备屏幕等低动态范围介质上，模拟、逼近高动态范围图像（HDR）效果
+                    renderer.toneMapping = Three.ACESFilmicToneMapping;
+                    container.appendChild(renderer.domElement);
+
+                    scene = new Three.Scene();
+
+                    camera = new Three.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
+                    camera.position.set(30, 30, 100);
+
+                    sun = new Three.Vector3();
+
+                    // Water
+
+                    const waterGeometry = new Three.PlaneGeometry(10000, 10000);
+
+                    water = new Water(
+                        waterGeometry,
+                        {
+                            textureWidth: 512,
+                            textureHeight: 512,
+                            waterNormals: new TextureLoader().load('http://shanmao.site/assets/textures/waternormals.jpg', function(texture) {
+
+                                texture.wrapS = texture.wrapT = Three.RepeatWrapping;
+
+                            }),
+                            sunDirection: new Three.Vector3(),
+                            sunColor: 0xffffff,
+                            waterColor: 0x001e0f,
+                            alpha: 0.5,
+                            distortionScale: 3.7,
+                            fog: scene.fog !== undefined
+                        }
+                    );
+
+                    water.rotation.x = -Math.PI / 2;
+                    console.log(water)
+                    scene.add(water);
+
+
+                    // Skybox
+                    const sky = new Sky();
+                    sky.scale.setScalar(10000);
+                    scene.add(sky);
+
+                    const skyUniforms = sky.material.uniforms;
+
+                    skyUniforms[ 'turbidity' ].value = 10;
+                    skyUniforms[ 'rayleigh' ].value = 2;
+                    skyUniforms[ 'mieCoefficient' ].value = 0.005;
+                    skyUniforms[ 'mieDirectionalG' ].value = 0.8;
+
+                    const parameters = {
+                        elevation: 2,
+                        azimuth: 180
+                    };
+
+                    const pmremGenerator = new Three.PMREMGenerator(renderer);
+
+                    function updateSun() {
+
+                        const phi = Three.MathUtils.degToRad(90 - parameters.elevation);
+                        const theta = Three.MathUtils.degToRad(parameters.azimuth);
+
+                        sun.setFromSphericalCoords(1, phi, theta);
+
+                        sky.material.uniforms[ 'sunPosition' ].value.copy(sun);
+                        water.material.uniforms[ 'sunDirection' ].value.copy(sun).normalize();
+
+                        scene.environment = pmremGenerator.fromScene(sky).texture;
+
+                    }
+
+                    updateSun();
+
+                    //
+
+                    const geometry = new Three.BoxGeometry(30, 30, 30);
+                    const material = new Three.MeshStandardMaterial({ roughness: 0 });
+
+                    mesh = new Three.Mesh(geometry, material);
+                    scene.add(mesh);
+
+                    //
+
+                    controls = new OrbitControls(camera, renderer.domElement);
+                    controls.maxPolarAngle = Math.PI * 0.495;
+                    controls.target.set(0, 10, 0);
+                    controls.minDistance = 40.0;
+                    controls.maxDistance = 200.0;
+                    controls.update();
+
+                    //
+
+                    stats = new Stats();
+                    container.appendChild(stats.dom);
+
+                    // GUI
+
+                    const gui = new dat.GUI();
+
+                    const folderSky = gui.addFolder('Sky');
+                    folderSky.add(parameters, 'elevation', 0, 90, 0.1).onChange(updateSun);
+                    folderSky.add(parameters, 'azimuth', -180, 180, 0.1).onChange(updateSun);
+                    folderSky.open();
+
+                    const waterUniforms = water.material.uniforms;
+
+                    const folderWater = gui.addFolder('Water');
+                    folderWater.add(waterUniforms.distortionScale, 'value', 0, 8, 0.1).name('distortionScale');
+                    folderWater.add(waterUniforms.size, 'value', 0.1, 10, 0.1).name('size');
+                    folderWater.open();
+
+                    //
+
+                    window.addEventListener('resize', onWindowResize);
+
+                }
+
+                function onWindowResize() {
+
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+
+                }
+
+                function animate() {
+
+                    requestAnimationFrame(animate);
+                    render();
+                    stats.update();
+
+                }
+
+                function render() {
+
+                    const time = performance.now() * 0.001;
+
+                    mesh.position.y = Math.sin(time) * 20 + 5;
+                    mesh.rotation.x = time * 0.5;
+                    mesh.rotation.z = time * 0.51;
+
+                    water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
+
+                    renderer.render(scene, camera);
+
+                }
+            },
+            // 指针锁定控制器
+            initPointer() {
+                let camera, scene, renderer, controls;
+
+                const objects = [];
+
+                let raycaster;
+
+                let moveForward = false;
+                let moveBackward = false;
+                let moveLeft = false;
+                let moveRight = false;
+                let canJump = false;
+
+                let prevTime = performance.now();
+                const velocity = new Three.Vector3();
+                const direction = new Three.Vector3();
+                const vertex = new Three.Vector3();
+                const color = new Three.Color();
+
+                init();
+                animate();
+
+                function init() {
+
+                    camera = new Three.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+                    camera.position.y = 10;
+
+                    scene = new Three.Scene();
+                    scene.background = new Three.Color(0xffffff);
+                    scene.fog = new Three.Fog(0xffffff, 0, 750);
+
+                    const light = new Three.HemisphereLight(0xeeeeff, 0x777788, 0.75);
+                    light.position.set(0.5, 1, 0.75);
+                    scene.add(light);
+
+                    controls = new PointerLockControls(camera, document.body);
+
+                    const blocker = document.getElementById('blocker');
+                    const instructions = document.getElementById('instructions');
+
+                    instructions.addEventListener('click', function() {
+                        controls.lock();
+                    });
+
+                    controls.addEventListener('lock', function() {
+                        instructions.style.display = 'none';
+                        blocker.style.display = 'none';
+                    });
+
+                    controls.addEventListener('unlock', function() {
+                        blocker.style.display = 'flex';
+                        instructions.style.display = '';
+                    });
+
+                    // controls.getObject()返回的是PointerLockControls构造函数传入的camera
+                    scene.add(controls.getObject());
+
+                    const onKeyDown = function(event) {
+                        console.log(event)
+                        switch (event.code) {
+
+                        case 'ArrowUp':
+                        case 'KeyW':
+                            moveForward = true;
+                            break;
+
+                        case 'ArrowLeft':
+                        case 'KeyA':
+                            moveLeft = true;
+                            break;
+
+                        case 'ArrowDown':
+                        case 'KeyS':
+                            moveBackward = true;
+                            break;
+
+                        case 'ArrowRight':
+                        case 'KeyD':
+                            moveRight = true;
+                            break;
+
+                        case 'Space':
+                            if (canJump === true) velocity.y += 350;
+                            canJump = false;
+                            break;
+
+                        }
+
+                    };
+
+                    const onKeyUp = function(event) {
+
+                        switch (event.code) {
+
+                        case 'ArrowUp':
+                        case 'KeyW':
+                            moveForward = false;
+                            break;
+
+                        case 'ArrowLeft':
+                        case 'KeyA':
+                            moveLeft = false;
+                            break;
+
+                        case 'ArrowDown':
+                        case 'KeyS':
+                            moveBackward = false;
+                            break;
+
+                        case 'ArrowRight':
+                        case 'KeyD':
+                            moveRight = false;
+                            break;
+
+                        }
+
+                    };
+
+                    document.addEventListener('keydown', onKeyDown);
+                    document.addEventListener('keyup', onKeyUp);
+
+                    raycaster = new Three.Raycaster(new Three.Vector3(), new Three.Vector3(0, -1, 0), 0, 10);
+
+                    // floor
+
+                    let floorGeometry = new Three.PlaneBufferGeometry(1, 1, 2, 2);
+                    floorGeometry.rotateX(-Math.PI / 2);
+
+                    // vertex displacement
+                    let position = floorGeometry.attributes.position;
+                    console.log('==1==')
+                    console.log(floorGeometry)
+
+                    for (let i = 0, l = position.count; i < l; i++) {
+
+                        vertex.fromBufferAttribute(position, i);
+
+                        vertex.x += Math.random() * 20 - 10;
+                        vertex.y += Math.random() * 2;
+                        vertex.z += Math.random() * 20 - 10;
+
+                        position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+
+                    }
+
+                    floorGeometry = floorGeometry.toNonIndexed() // ensure each face has unique vertices
+
+                    position = floorGeometry.attributes.position;
+                    const colorsFloor = [];
+
+                    for (let i = 0, l = position.count; i < l; i++) {
+
+                        color.setHSL(Math.random() * 0.3 + 0.5, 0.75, Math.random() * 0.25 + 0.75);
+                        colorsFloor.push(color.r, color.g, color.b);
+
+                    }
+
+                    floorGeometry.setAttribute('color', new Three.Float32BufferAttribute(colorsFloor, 3));
+
+                    const floorMaterial = new Three.MeshBasicMaterial({ vertexColors: true });
+
+                    const floor = new Three.Mesh(floorGeometry, floorMaterial);
+                    scene.add(floor);
+
+                    // objects
+
+                    const boxGeometry = new Three.BoxBufferGeometry(20, 20, 20).toNonIndexed();
+
+                    position = boxGeometry.attributes.position;
+                    const colorsBox = [];
+
+                    for (let i = 0, l = position.count; i < l; i++) {
+
+                        color.setHSL(Math.random() * 0.3 + 0.5, 0.75, Math.random() * 0.25 + 0.75);
+                        colorsBox.push(color.r, color.g, color.b);
+
+                    }
+
+                    boxGeometry.setAttribute('color', new Three.Float32BufferAttribute(colorsBox, 3));
+
+                    for (let i = 0; i < 500; i++) {
+
+                        const boxMaterial = new Three.MeshPhongMaterial({ specular: 0xffffff, flatShading: true, vertexColors: true });
+                        boxMaterial.color.setHSL(Math.random() * 0.2 + 0.5, 0.75, Math.random() * 0.25 + 0.75);
+
+                        const box = new Three.Mesh(boxGeometry, boxMaterial);
+                        box.position.x = Math.floor(Math.random() * 20 - 10) * 20;
+                        box.position.y = Math.floor(Math.random() * 20) * 20 + 10;
+                        box.position.z = Math.floor(Math.random() * 20 - 10) * 20;
+
+                        scene.add(box);
+                        objects.push(box);
+
+                    }
+
+                    //
+
+                    renderer = new Three.WebGLRenderer({ antialias: true });
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    document.body.appendChild(renderer.domElement);
+
+                    //
+
+                    window.addEventListener('resize', onWindowResize);
+
+                }
+
+                function onWindowResize() {
+
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+
+                }
+
+                function animate() {
+
+                    requestAnimationFrame(animate);
+
+                    const time = performance.now();
+
+                    if (controls.isLocked === true) {
+
+                        raycaster.ray.origin.copy(controls.getObject().position);
+                        raycaster.ray.origin.y -= 10;
+
+                        const intersections = raycaster.intersectObjects(objects);
+
+                        const onObject = intersections.length > 0;
+
+                        const delta = (time - prevTime) / 1000;
+
+                        velocity.x -= velocity.x * 10.0 * delta;
+                        velocity.z -= velocity.z * 10.0 * delta;
+
+                        velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+
+                        direction.z = Number(moveForward) - Number(moveBackward);
+                        direction.x = Number(moveRight) - Number(moveLeft);
+                        direction.normalize(); // this ensures consistent movements in all directions
+
+                        if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+                        if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+
+                        if (onObject === true) {
+
+                            velocity.y = Math.max(0, velocity.y);
+                            canJump = true;
+
+                        }
+
+                        controls.moveRight(-velocity.x * delta);
+                        controls.moveForward(-velocity.z * delta);
+
+                        controls.getObject().position.y += (velocity.y * delta); // new behavior
+
+                        if (controls.getObject().position.y < 10) {
+
+                            velocity.y = 0;
+                            controls.getObject().position.y = 10;
+
+                            canJump = true;
+
+                        }
+
+                    }
+
+                    prevTime = time;
+
+                    renderer.render(scene, camera);
+
+                }
+            },
+            // 设置元素全屏
+            setFullScreen(element) {
+                var el = document.documentElement
+                var rfs = el.requestFullscreen ||
+                    el.webkitRequestFullscreen ||
+                    el.mozRequestFullScreen ||
+                    el.msRequestFullscreen;
+                if (rfs) {
+                    rfs.call(el);
+                } else if (window.ActiveXObject) {
+                    var ws = new ActiveXObject('WScript.Shell');
+                    ws && ws.SendKeys('{F11}');
+                }
+            },
             initDrag() {
                 let container;
                 let camera, scene, renderer;
@@ -2863,4 +3335,23 @@
     /*    background: rgba(0, 0, 0, 1);*/
     /*    margin: 40px 0;*/
     /*}*/
+
+    #blocker {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #instructions {
+        color: #ffffff;
+        text-align: center;
+        font-family: Arial;
+        font-size: 14px;
+        line-height: 24px;
+        cursor: pointer;
+    }
 </style>
