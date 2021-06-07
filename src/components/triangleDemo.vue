@@ -10,6 +10,8 @@
         <!-- 3d星空环绕 -->
         <canvas v-if="false" id="canvasElem4"></canvas>
 
+<!--        <canvas id="canvasElem5"></canvas>-->
+
         <!-- 三维正方体 -->
         <div class="container" id="container"></div>
 
@@ -23,6 +25,15 @@
 <!--                Look: MOUSE-->
 <!--            </div>-->
 <!--        </div>-->
+
+<!--        <canvas id="c"></canvas>-->
+<!--        <div id="content">-->
+<!--            <div>-->
+<!--                <h1>Cubes-R-Us!</h1>-->
+<!--                <p>We make the best cubes!</p>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--        <button id="screenshot" type="button">Save...</button>-->
 
     </div>
 
@@ -49,6 +60,7 @@
     import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
     import { Water } from 'three/examples/jsm/objects/Water.js'
     import { Sky } from 'three/examples/jsm/objects/Sky.js'
+    import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
     // 后期处理相关
     import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -82,9 +94,395 @@
             // this.initSound()
             // this.initDrag()
             // this.initPointer()
-            this.initWater()
+            // this.initWater()
+            // this.initScreenshot()
+            // this.initPopulation()
+            this.initPopulation3D()
         },
         methods: {
+            initPopulation3D() {
+                // const canvas = document.querySelector('#c');
+                // const renderer = new Three.WebGLRenderer({ canvas });
+
+
+                const container = document.getElementById('container');
+
+                const renderer = new Three.WebGLRenderer();
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                container.appendChild(renderer.domElement);
+
+                const fov = 60;
+                const aspect = 2; // the canvas default
+                const near = 0.1;
+                const far = 10;
+                const camera = new Three.PerspectiveCamera(fov, aspect, near, far);
+                camera.position.z = 2.5;
+
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.enablePan = false;
+                controls.minDistance = 1.2;
+                controls.maxDistance = 4;
+                controls.update();
+
+                const scene = new Three.Scene();
+                scene.background = new Three.Color('black');
+
+                {
+                    const loader = new Three.TextureLoader();
+                    const texture = loader.load('https://threejsfundamentals.org/threejs/resources/images/world.jpg', render);
+                    const geometry = new Three.SphereGeometry(1, 64, 32);
+                    const material = new Three.MeshBasicMaterial({ map: texture });
+                    scene.add(new Three.Mesh(geometry, material));
+                }
+
+                async function loadFile(url) {
+                    const req = await fetch(url);
+                    return req.text();
+                }
+
+                function parseData(text) {
+                    const data = [];
+                    const settings = { data };
+                    let max;
+                    let min;
+                    // split into lines
+                    text.split('\n').forEach((line) => {
+                        // split the line by whitespace
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length === 2) {
+                            // only 2 parts, must be a key/value pair
+                            settings[parts[0]] = parseFloat(parts[1]);
+                        } else if (parts.length > 2) {
+                            // more than 2 parts, must be data
+                            const values = parts.map((v) => {
+                                const value = parseFloat(v);
+                                if (value === settings.NODATA_value) {
+                                    return undefined;
+                                }
+                                max = Math.max(max === undefined ? value : max, value);
+                                min = Math.min(min === undefined ? value : min, value);
+                                return value;
+                            });
+                            data.push(values);
+                        }
+                    });
+                    return Object.assign(settings, { min, max });
+                }
+
+                function addBoxes(file) {
+                    const { min, max, data } = file;
+                    const range = max - min;
+
+                    // these helpers will make it easy to position the boxes
+                    // We can rotate the lon helper on its Y axis to the longitude
+                    const lonHelper = new Three.Object3D();
+                    scene.add(lonHelper);
+                    // We rotate the latHelper on its X axis to the latitude
+                    const latHelper = new Three.Object3D();
+                    lonHelper.add(latHelper);
+                    // The position helper moves the object to the edge of the sphere
+                    const positionHelper = new Three.Object3D();
+                    positionHelper.position.z = 1;
+                    latHelper.add(positionHelper);
+                    // Used to move the center of the cube so it scales from the position Z axis
+                    const originHelper = new Three.Object3D();
+                    originHelper.position.z = 0.5;
+                    positionHelper.add(originHelper);
+
+                    const color = new Three.Color();
+
+                    const lonFudge = Math.PI * 0.5;
+                    const latFudge = Math.PI * -0.135;
+                    const geometries = [];
+                    data.forEach((row, latNdx) => {
+                        row.forEach((value, lonNdx) => {
+                            if (value === undefined) {
+                                return;
+                            }
+                            const amount = (value - min) / range;
+
+                            const boxWidth = 1;
+                            const boxHeight = 1;
+                            const boxDepth = 1;
+                            const geometry = new Three.BoxBufferGeometry(boxWidth, boxHeight, boxDepth);
+
+                            // adjust the helpers to point to the latitude and longitude
+                            lonHelper.rotation.y = Three.MathUtils.degToRad(lonNdx + file.xllcorner) + lonFudge;
+                            latHelper.rotation.x = Three.MathUtils.degToRad(latNdx + file.yllcorner) + latFudge;
+
+                            // use the world matrix of the origin helper to
+                            // position this geometry
+                            positionHelper.scale.set(0.005, 0.005, Three.MathUtils.lerp(0.01, 0.5, amount));
+                            originHelper.updateWorldMatrix(true, false);
+                            geometry.applyMatrix4(originHelper.matrixWorld);
+
+                            // compute a color
+                            const hue = Three.MathUtils.lerp(0.7, 0.3, amount);
+                            const saturation = 1;
+                            const lightness = Three.MathUtils.lerp(0.4, 1.0, amount);
+                            color.setHSL(hue, saturation, lightness);
+                            // get the colors as an array of values from 0 to 255
+                            const rgb = color.toArray().map(v => v * 255);
+
+                            // make an array to store colors for each vertex
+                            const numVerts = geometry.getAttribute('position').count;
+                            const itemSize = 3; // r, g, b
+                            const colors = new Uint8Array(itemSize * numVerts);
+
+                            // copy the color into the colors array for each vertex
+                            colors.forEach((v, ndx) => {
+                                colors[ndx] = rgb[ndx % 3];
+                            });
+
+                            const normalized = true;
+                            const colorAttrib = new Three.BufferAttribute(colors, itemSize, normalized);
+                            geometry.setAttribute('color', colorAttrib);
+
+                            geometries.push(geometry);
+                        });
+                    });
+
+                    const mergedGeometry = BufferGeometryUtils.mergeBufferGeometries(
+                        geometries, false);
+                    const material = new Three.MeshBasicMaterial({
+                        vertexColors: true
+                    });
+                    const mesh = new Three.Mesh(mergedGeometry, material);
+                    scene.add(mesh);
+                }
+
+                loadFile('https://threejsfundamentals.org/threejs/resources/data/gpw/gpw_v4_basic_demographic_characteristics_rev10_a000_014mt_2010_cntm_1_deg.asc')
+                    .then(parseData)
+                    .then(addBoxes)
+                    .then(render);
+
+                function resizeRendererToDisplaySize(renderer) {
+                    const canvas = renderer.domElement;
+                    const width = canvas.clientWidth;
+                    const height = canvas.clientHeight;
+                    const needResize = canvas.width !== width || canvas.height !== height;
+                    if (needResize) {
+                        renderer.setSize(width, height, false);
+                    }
+                    return needResize;
+                }
+
+                let renderRequested = false;
+
+                function render() {
+                    renderRequested = undefined;
+
+                    if (resizeRendererToDisplaySize(renderer)) {
+                        const canvas = renderer.domElement;
+                        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                        camera.updateProjectionMatrix();
+                    }
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                render();
+
+                function requestRenderIfNotRequested() {
+                    if (!renderRequested) {
+                        renderRequested = true;
+                        requestAnimationFrame(render);
+                    }
+                }
+
+                controls.addEventListener('change', requestRenderIfNotRequested);
+                window.addEventListener('resize', requestRenderIfNotRequested);
+            },
+            initPopulation() {
+                async function loadFile(url) {
+                    const req = await fetch(url);
+                    return req.text();
+                }
+
+                function parseData(text) {
+                    const data = [];
+                    const settings = { data };
+                    let max;
+                    let min;
+                    // split into lines
+                    text.split('\n').forEach((line) => {
+                        // split the line by whitespace
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length === 2) {
+                            // only 2 parts, must be a key/value pair
+                            settings[parts[0]] = parseFloat(parts[1]);
+                        } else if (parts.length > 2) {
+                            // more than 2 parts, must be data
+                            const values = parts.map((v) => {
+                                const value = parseFloat(v);
+                                if (value === settings.NODATA_value) {
+                                    return undefined;
+                                }
+                                max = Math.max(max === undefined ? value : max, value);
+                                min = Math.min(min === undefined ? value : min, value);
+                                return value;
+                            });
+                            data.push(values);
+                        }
+                    });
+                    return Object.assign(settings, { min, max });
+                }
+
+                function drawData(file) {
+                    const { min, max, ncols, nrows, data } = file;
+                    const range = max - min;
+                    const ctx = document.querySelector('canvas').getContext('2d');
+                    // make the canvas the same size as the data
+                    ctx.canvas.width = ncols;
+                    ctx.canvas.height = nrows;
+                    // but display it double size so it's not too small
+                    ctx.canvas.style.width = px(ncols * 2);
+                    // fill the canvas to dark gray
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    // draw each data point
+                    data.forEach((row, latNdx) => {
+                        row.forEach((value, lonNdx) => {
+                            if (value === undefined) {
+                                return;
+                            }
+                            const amount = (value - min) / range;
+                            const hue = 1;
+                            const saturation = 1;
+                            const lightness = amount;
+                            ctx.fillStyle = hsl(hue, saturation, lightness);
+                            ctx.fillRect(lonNdx, latNdx, 1, 1);
+                        });
+                    });
+                }
+
+                function px(v) {
+                    return `${v | 0}px`;
+                }
+
+                function hsl(h, s, l) {
+                    return `hsl(${h * 360 | 0},${s * 100 | 0}%,${l * 100 | 0}%)`;
+                }
+
+                loadFile('https://threejsfundamentals.org/threejs/resources/data/gpw/gpw_v4_basic_demographic_characteristics_rev10_a000_014mt_2010_cntm_1_deg.asc')
+                    .then(parseData)
+                    .then(drawData);
+            },
+            // canvas截屏
+            initScreenshot() {
+                const canvas = document.querySelector('#c');
+                canvas.width = 1000
+                canvas.height = 800
+                const renderer = new Three.WebGLRenderer({
+                    canvas,
+                    alpha: true,
+                    premultipliedAlpha: false
+                });
+
+                const fov = 75;
+                const aspect = 2; // the canvas default
+                const near = 0.1;
+                const far = 5;
+                const camera = new Three.PerspectiveCamera(fov, aspect, near, far);
+                camera.position.z = 2;
+
+                const scene = new Three.Scene();
+
+                const color = 0xFFFFFF;
+                const intensity = 1;
+                const light = new Three.DirectionalLight(color, intensity);
+                light.position.set(-1, 2, 4);
+                scene.add(light);
+
+                const boxWidth = 1;
+                const boxHeight = 1;
+                const boxDepth = 1;
+                const geometry = new Three.BoxGeometry(boxWidth, boxHeight, boxDepth);
+
+                function makeInstance(geometry, color, x) {
+                    const material = new Three.MeshPhongMaterial({
+                        color,
+                        opacity: 0.5
+                    });
+
+                    const cube = new Three.Mesh(geometry, material);
+                    scene.add(cube);
+
+                    cube.position.x = x;
+
+                    return cube;
+                }
+
+                const cubes = [
+                    makeInstance(geometry, 0x44aa88, 0),
+                    makeInstance(geometry, 0x8844aa, -2),
+                    makeInstance(geometry, 0xaa8844, 2)
+                ];
+
+                function resizeRendererToDisplaySize(renderer) {
+                    const canvas = renderer.domElement;
+                    const width = canvas.clientWidth;
+                    const height = canvas.clientHeight;
+                    const needResize = canvas.width !== width || canvas.height !== height;
+                    if (needResize) {
+                        renderer.setSize(width, height, false);
+                    }
+                    return needResize;
+                }
+
+                const state = {
+                    time: 0
+                };
+
+                function render() {
+                    if (resizeRendererToDisplaySize(renderer)) {
+                        const canvas = renderer.domElement;
+                        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                        camera.updateProjectionMatrix();
+                    }
+
+                    cubes.forEach((cube, ndx) => {
+                        const speed = 1 + ndx * 0.1;
+                        const rot = state.time * speed;
+                        cube.rotation.x = rot;
+                        cube.rotation.y = rot;
+                    });
+
+                    renderer.render(scene, camera);
+                }
+
+                function animate(time) {
+                    state.time = time * 0.001;
+
+                    render();
+
+                    requestAnimationFrame(animate);
+                }
+
+                animate()
+
+                const elem = document.querySelector('#screenshot');
+                elem.addEventListener('click', () => {
+                    render()
+                    canvas.toBlob((blob) => {
+                        saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`);
+                    });
+                });
+
+                const saveBlob = (function() {
+                    const a = document.createElement('a');
+                    document.body.appendChild(a);
+                    a.style.display = 'none';
+                    return function saveData(blob, fileName) {
+                        const url = window.URL.createObjectURL(blob);
+                        a.href = url;
+                        a.download = fileName;
+                        a.click();
+                    };
+                }());
+            },
             initWater() {
                 let container, stats;
                 let camera, scene, renderer;
@@ -3335,6 +3733,27 @@
     /*    background: rgba(0, 0, 0, 1);*/
     /*    margin: 40px 0;*/
     /*}*/
+
+    #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: -1;
+        pointer-events: none;
+    }
+    #content {
+        font-size: 7vw;
+        font-family: sans-serif;
+        text-align: center;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
     #blocker {
         position: absolute;
